@@ -24,11 +24,11 @@
  ********************************************************/
 team_t team = {
 	/* Team name */
-	"instructors",
+	"Anything-But-Java",
 	/* First member's full name */
-	"Jinyang Li",
+	"Michael Bartnett",
 	/* First member's NYU NetID*/
-	"jyl123@nyu.edu",
+	"mrb402",
 	/* Second member's full name (leave blank if none) */
 	"",
 	/* Second member's email address (leave blank if none) */
@@ -43,6 +43,18 @@ team_t team = {
 
 
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
+
+
+typedef BOOL int;
+typedef unsigned int void_ptr;
+
+
+/*  */
+typedef struct
+{
+	void_ptr address,
+	BOOL free,
+} mm_MemblockHeader_t
 
 /* 
  * mm_init - initialize the malloc package.
