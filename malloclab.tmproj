@@ -46,7 +46,7 @@
 			<key>filename</key>
 			<string>Makefile</string>
 			<key>lastUsed</key>
-			<date>2011-04-18T06:04:50Z</date>
+			<date>2011-04-27T04:13:03Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
@@ -58,19 +58,19 @@
 			<key>filename</key>
 			<string>memlib.c</string>
 			<key>lastUsed</key>
-			<date>2011-04-18T05:52:43Z</date>
+			<date>2011-04-27T06:00:40Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>memlib.h</string>
 			<key>lastUsed</key>
-			<date>2011-04-18T03:51:26Z</date>
+			<date>2011-04-27T05:43:53Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>mm.c</string>
 			<key>lastUsed</key>
-			<date>2011-04-18T06:04:50Z</date>
+			<date>2011-04-29T02:56:59Z</date>
 			<key>selected</key>
 			<true/>
 		</dict>
@@ -78,7 +78,7 @@
 			<key>filename</key>
 			<string>mm.h</string>
 			<key>lastUsed</key>
-			<date>2011-04-18T03:51:45Z</date>
+			<date>2011-04-24T19:49:16Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
@@ -87,6 +87,8 @@
 			<date>2011-04-18T03:51:27Z</date>
 		</dict>
 		<dict>
+			<key>expanded</key>
+			<true/>
 			<key>name</key>
 			<string>traces</string>
 			<key>regexFolderFilter</key>
@@ -127,19 +129,47 @@
 			<key>firstVisibleLine</key>
 			<integer>88</integer>
 		</dict>
+		<key>memlib.c</key>
+		<dict>
+			<key>caret</key>
+			<dict>
+				<key>column</key>
+				<integer>19</integer>
+				<key>line</key>
+				<integer>7</integer>
+			</dict>
+			<key>firstVisibleColumn</key>
+			<integer>0</integer>
+			<key>firstVisibleLine</key>
+			<integer>8</integer>
+		</dict>
+		<key>memlib.h</key>
+		<dict>
+			<key>caret</key>
+			<dict>
+				<key>column</key>
+				<integer>26</integer>
+				<key>line</key>
+				<integer>9</integer>
+			</dict>
+			<key>firstVisibleColumn</key>
+			<integer>0</integer>
+			<key>firstVisibleLine</key>
+			<integer>0</integer>
+		</dict>
 		<key>mm.c</key>
 		<dict>
 			<key>caret</key>
 			<dict>
 				<key>column</key>
-				<integer>1</integer>
+				<integer>51</integer>
 				<key>line</key>
-				<integer>50</integer>
+				<integer>115</integer>
 			</dict>
 			<key>firstVisibleColumn</key>
 			<integer>0</integer>
 			<key>firstVisibleLine</key>
-			<integer>26</integer>
+			<integer>73</integer>
 		</dict>
 		<key>mm.h</key>
 		<dict>
@@ -160,6 +190,8 @@
 	<array>
 		<string>README</string>
 		<string>Makefile</string>
+		<string>memlib.h</string>
+		<string>memlib.c</string>
 		<string>mm.c</string>
 		<string>mm.h</string>
 	</array>
@@ -168,8 +200,16 @@
 	<key>showFileHierarchyPanel</key>
 	<true/>
 	<key>treeState</key>
-	<dict/>
+	<dict>
+		<key>traces</key>
+		<dict>
+			<key>isExpanded</key>
+			<true/>
+			<key>subItems</key>
+			<dict/>
+		</dict>
+	</dict>
 	<key>windowFrame</key>
-	<string>{{4, 3}, {926, 874}}</string>
+	<string>{{466, 4}, {926, 874}}</string>
 </dict>
 </plist>
