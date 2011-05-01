@@ -5,7 +5,7 @@
 	<key>EmbeddedEditorHidden:michaelbartnett</key>
 	<false/>
 	<key>ExpandedEditorWidth:michaelbartnett:displays([(0, 0), (1440, 900)])</key>
-	<integer>640</integer>
+	<integer>641</integer>
 	<key>ExpandedItems:michaelbartnett</key>
 	<array/>
 	<key>FileFilterID:michaelbartnett</key>
@@ -17,8 +17,8 @@
 			<data>
 			AAAAAAHOAAIAAAxNYWNpbnRvc2ggSEQAAAAAAAAAAAAAAAAAAADJ
 			IayJSCsAAADPKaIEbW0uYwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-			AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAO1C
-			zcnCpQZURVhUAAAAAP////8AAAkgAAAAAAAAAAAAAAAAAAAAEW1h
+			AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAO1b
+			m8nCpQZURVhUAAAAAP////8AAAkgAAAAAAAAAAAAAAAAAAAAEW1h
 			bGxvY2xhYi1oYW5kb3V0AAAQAAgAAMkh8tkAAAARAAgAAMnC3UYA
 			AAABABgAzymiAGL1EgAIa0cACGtCAAWsqwAAkeUAAgBbTWFjaW50
 			b3NoIEhEOlVzZXJzOm1pY2hhZWxiYXJ0bmV0dDpEZXZlbG9wbWVu
@@ -125,8 +125,8 @@
 	<key>ToolbarVisible:michaelbartnett</key>
 	<true/>
 	<key>ViewSplitterPosition:michaelbartnett</key>
-	<real>0.26011559367179871</real>
+	<real>0.25895953178405762</real>
 	<key>WindowFrame:michaelbartnett:displays([(0, 0), (1440, 900)])</key>
-	<string>rect(44,181,896,1046)</string>
+	<string>rect(65,184,917,1049)</string>
 </dict>
 </plist>

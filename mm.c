@@ -72,8 +72,16 @@ to page size. */
 #define GET_NEXTBLOCK(bp) ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))
 #define GET_PREVBLOCK(bp) ((char *)(bp) - GETSIZE(((char *)(bp) - DSIZE)))
 
+#define FREELIST_COUNT 13
+
+
 /* Using size segregated explicit free lists */
-static CHUNK * free_lists[13] /* Segregate by word size power of 2, up to 4096 words */
+static CHUNK * free_lists[FREELIST_COUNT] /* Segregate by word size power of 2, up to 4096 words */
+
+typedef struct {
+	unsigned int size_alloc;
+	char * successor;
+} mem_header;
 
 static unsigned int PAGE_SIZE;
 static unsigned int PAGE_WORDS;
@@ -84,6 +92,8 @@ static unsigned char * heap_end;
 static int calc_min_bits(size_t size);
 static void *extend_heap(size_t words);
 static void *coalesce(void *bp);
+static void place(void *bp, size_t adjusted_size);
+static void * find_fit(size_t block_size);
 
 /**
  * mm_init - initialize the malloc package.
@@ -121,12 +131,11 @@ int mm_init(void)
 	
 	PUTW(GET_BLOCKHDR(chunk_addr), PACK(num_bytes, 0));
 	PUTW(GET_BLOCKFTR(chunk)addr), PACK(num_bytes, 0));
-	/* TODO: Figure out if I need to do the Prologue and Epilogue block.
-	mm_maloc should check the freelists instead of traverse a free list
+	/* mm_maloc should check the freelists instead of traverse a free list
 	coalesce shouldn't change. Should pull this segment of code out into
 	either mm_free or a mark_free() function or macro.
 	*/
-	/* Ensure first block of free memory is aligned to  */
+	/* Ensure first block of free memory is aligned to */
 	free_lists[calc_min_bits(PAGE_WORDS)] = heap_start + ALIGNMENT;
 	
 	
@@ -139,14 +148,32 @@ int mm_init(void)
  */
 void *mm_malloc(size_t size)
 {
-	int newsize = ALIGN(size + SIZE_T_SIZE);
-	void *p = mem_sbrk(newsize);
-	if (p == (void *)-1)
+	size_t adjusted_size; /* Adjusted (aligned) block size */
+	size_t extendsize	  /* Amount to extend heap if no fit */
+	char *bp;
+	
+	/* Ignore stupid/ugly programmers */
+	if (size == 0)
 		return NULL;
-	else {
-		*(size_t *)p = size;
-		return (void *)((char *)p + SIZE_T_SIZE);
+	
+	/* Adjust block size to allow for header and match alignment */
+	if (size <= DSIZE)
+		adjusted_size = 2 * DSIZE;
+	else
+		adjusted_size = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
+	
+	/* Search for a best fit */
+	if ((bp = find_fit(adjusted_size)) != NULL) {
+		place(bp, adjusted_size);
+		return bp;
 	}
+	
+	/* No fit found, extend the heap */
+	extendsize = MAX(adjusted_size, PAGE_SIZE);
+	if ((bp = extend_heap(extendsize)) == NULL) {
+		return NULL;
+	place(bp, adjusted_size);
+	return bp;
 }
 
 /*
@@ -247,4 +274,44 @@ static void *coalesce(void *bp)
 	}
 	
 	return bp;
+}
+
+/**
+ * place block (Write header & footer)
+ */
+static void place(void *bp, size_t adjusted_size)
+{
+	size_t csize = GET_SIZE(GET_BLOCKHDR(bp));
+	
+	if ((csize - adjusted_size) >= (2 * DSIZE)) {
+		PUTW(GET_BLOCKHDR(bp), PACK(adjusted_size, 1));
+		PUTW(GET_BLOCKFTR(bp), PACK(adjusted_size, 1));
+		bp = GET_NEXTBLOCK(bp);
+		PUTW(GET_BLOCKHDR(bp), PACK(csize - adjusted_size, 0));
+		PUTW(GET_BLOCKFTR(bp), PACK(csize - adjusted_size, 0));
+	}
+	
+	else {
+		PUTW(GET_BLOCKHDR(bp), PACK(csize, 1));
+		PUTW(GET_BLOCKFTR(bp), PACK(cisze, 1));
+	}
+}
+
+/**
+ * Find a free block of memory of size block_size
+ */
+static void * find_fit(size_t block_size)
+{
+	int list_index,
+		min_index = calc_min_bits(block_size);
+	
+	/* Look at the free list with the minimum size needed to hold block_size */
+	for (list_index = min_index; list_index < FREELIST_COUNT; list_index++) {
+		/* If the head of the list is not null, we can use it */
+		if (free_lists[list_index] != NULL && !GET_ALLOC(free_lists[list_index])) {
+			return (void *)free_lists[list_index];
+		}
+		/* Otherwise,  */
+	}
+	return NULL;
 }
