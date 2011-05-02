@@ -71,6 +71,9 @@ to page size. */
 #define THISALLOC 0x01
 #define PREVALLOC (0x01 << 1)
 
+/* Self-explanatory */
+#define MAX(x, y) ((x) > (y)? (x) : (y))
+
 /* Read and write word value at address 'p' */
 #define GETW(p) (*(unsigned int *)(p))
 #define PUTW(p, val) (*(unsigned int *)(p) = (val))
@@ -104,9 +107,14 @@ to page size. */
 /* Using size segregated explicit free lists */
 static char * free_lists[FREELIST_COUNT]; /* Segregate by word size power of 2, up to 4096 words */
 
+#define AS_MEM_HEADER(p) ((mem_header *)GET_BLOCKHDR(p))
 typedef struct {
 	unsigned int size_alloc;
-	char * successor;
+	char *next_free;		/* IMPORTANT!!! The next_free and prev_free fields*/
+	char *prev_free;		/* of this struct point to the START of payload,  */
+							/* not the start of the struct. Remember to always*/
+							/* adjust if you want to set the *_free of one	  */
+							/* mem_header to another mem_header.			  */
 } mem_header;
 
 static size_t PAGE_SIZE;
@@ -122,7 +130,9 @@ static void *extend_heap(size_t adjusted_size);
 static void *coalesce(void *bp);
 static void allocate(void *bp, size_t adjusted_size);
 static void * find_fit(size_t block_size);
-static void *find_end_of_list(int power_of_two);
+static void *find_end_of_list(int list_index);
+static void add_to_list(char *bp, int list_index);
+static void remove_from_list(char *bp, int list_index);
 
 
 
@@ -179,10 +189,9 @@ int mm_init(void)
  * mm_malloc - Allocate a block by incrementing the brk pointer.
  *     Always allocate a block whose size is a multiple of the alignment.
  */
-void *malloc(size_t size)
+void *mm_malloc(size_t size)
 {
 	size_t adjusted_size; /* Adjusted (aligned) block size */
-	size_t extendsize;	  /* Amount to extend heap if no fit */
 	char *bp;
 
 	/* Ignore stupid/ugly programmers */
@@ -195,14 +204,19 @@ void *malloc(size_t size)
 	/* Search for a best fit */
 	if ((bp = find_fit(adjusted_size)) != NULL) {
 		allocate(bp, adjusted_size);
+
 		return bp;
 	}
 
 	/* No fit found, extend the heap */
-	extendsize = MAX(adjusted_size, ADJUSTED_PAGESIZE);
-	if ((bp = extend_heap(extendsize)) == NULL)
+	/* Reuse existing adjusted_size variable */
+	adjusted_size = MAX(adjusted_size, ADJUSTED_PAGESIZE);
+
+	if ((bp = extend_heap(adjusted_size)) == NULL)
 		return NULL;
+
 	allocate(bp, adjusted_size);
+
 	return bp;
 }
 
@@ -242,6 +256,7 @@ void *mm_realloc(void *ptr, size_t size)
 
 /**
  * Calculate bits needed to store a value
+ * This is used to determine which free list to look in.
  */
 static int calc_min_bits(size_t size)
 {
@@ -269,7 +284,7 @@ static void *extend_heap(size_t adusted_size)
 {
 	char *bp;
 
-	if ((long)(bp = mem_sbrk(size)) == -1)
+	if ((long)(bp = mem_sbrk(adjusted_size)) == -1)
 		return NULL;
 
 	/* Initialize free block header/footer and the epilogue header */
@@ -283,6 +298,8 @@ static void *extend_heap(size_t adusted_size)
 
 /**
  * Concatenate adjacent blocks
+ *
+ * Should upkeep the free list.
  */
 static void *coalesce(void *bp)
 {
@@ -331,11 +348,15 @@ static void allocate(void *bp, size_t adjusted_size)
 
 		PUTW(GET_BLOCKHDR(bp), PACK(adjusted_size, THISALLOC | isPrevAlloc));
 		PUTW(GET_BLOCKFTR(bp), PACK(adjusted_size, THISALLOC | isPrevAlloc));
+
+		remove_from_list(bp, calc_min_bits(adjusted_size));
+
 		bp = GET_NEXTBLOCK(bp);
 		PUTW(GET_BLOCKHDR(bp), PACK(csize - adjusted_size, PREVALLOC));
 		PUTW(GET_BLOCKFTR(bp), PACK(csize - adjusted_size, PREVALLOC));
-	}
 
+
+	}
 	else {
 		PUTW(GET_BLOCKHDR(bp), PACK(csize, THISALLOC | isPrevAlloc));
 		PUTW(GET_BLOCKFTR(bp), PACK(csize, THISALLOC | isPrevAlloc));
@@ -390,7 +411,7 @@ static void * find_fit(size_t block_size)
 /**
  *
  */
-static void *find_end_of_list(int power_of_two)
+static void *find_end_of_list(int list_index)
 {
 	char *bp = free_lists[power_of_two];
 	char *next_bp = bp;
@@ -403,7 +424,69 @@ static void *find_end_of_list(int power_of_two)
 }
 
 
+
+/**
+ * remove_from_list(char *bp, int list_index)
+ *
+ * Remove the block from the specified free list
+ *
+ * Parameters:
+ *
+ * 	  bp - Pointer to the payload
+ * 	  list_index - The free list index (power of two representing word size)
+ */
+static void remove_from_list(char *bp, int list_index)
+{
+	mem_header *header = AS_MEM_HEADER(bp);
+	mem_header *next_header = AS_MEM_HEADER(header->next_free);
+	mem_header *prev_header;
+
+	/* Case where block is head of list */
+	if (free_lists[list_index] == bp) {
+		free_lists[list_index] = header->next_free;
+		next_header->prev_free = NULL;
+
+		return;
+	}
+
+	/* Default case */
+	/* Find the previous header (since we didn't have it before) */
+	prev_header = AS_MEM_HEADER(header->prev_free);
+
+	/* Make the prev_free and next_free of the previous and next list items
+	 * point to each other's payload. */
+	prev_header->next_free = header->next_free;
+	next_header->prev_free = header->prev_free;
+}
+
+
+
+/**
+ * add_to_list(char *bp, int list_index)
+ *
+ * Add the block to the specified free list
+ *
+ * Parameters:
+ *
+ * 	  bp - Pointer to the payload
+ * 	  list_index - The free list index (power of two representing word size)
+ */
+static void add_to_list(char *bp, int list_index)
+{
+	char *prev;
+	mem_header *header = AS_MEM_HEADER(bp);
+	mem_header *last_node;
+
+	prev = find_end_of_list(list_index);
+	last_node = AS_MEM_HEADER(prev);
+
+	last_node->next_free = bp;
+	header->prev_free = prev;
+	header->next_free = NULL;
+}
+
+
 int main(int argc, char* argv[])
 {
-
+	return 0;
 }
