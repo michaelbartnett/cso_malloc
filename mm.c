@@ -230,12 +230,10 @@ void *mm_malloc(size_t size)
 	}
 
 	/* No fit found, extend the heap */
-	/* Reuse existing adjusted_size variable */
-	adjusted_size = MAX(adjusted_size, ADJUSTED_PAGESIZE);
-
-	if ((bp = extend_heap(adjusted_size)) == NULL)
+	if ((bp = extend_heap(MAX(adjusted_size, ADJUSTED_PAGESIZE))) == NULL)
 		return NULL;
 
+	bp += WSIZE; /* Move bp up to payload address */
 	allocate(bp, adjusted_size);
 
 	return bp;
@@ -297,7 +295,7 @@ static int calc_min_bits(size_t size)
  *
  * This differs from the example extend_heap function in that the parameter
  * passed is in BYTES rather than WORDS. Constantly converting between the two
- *g is confusing and unnecessary.
+ * is confusing and unnecessary.
  *
  * Furthermore, it should be a size already adjusted to fit byte and header
  * alignment. This method merely sets header/footer/successor as needed
