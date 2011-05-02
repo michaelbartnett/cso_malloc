@@ -91,7 +91,7 @@ to page size. */
 
 /*  */
 #define GET_NEXTBLOCK(bp) ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))
-#define GET_PREVBLOCK(bp) ((char *)(bp) - GETSIZE(((char *)(bp) - DSIZE)))
+#define GET_PREVBLOCK(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 
 #define FREELIST_COUNT 13
 
@@ -181,7 +181,7 @@ int mm_init(void)
 void *malloc(size_t size)
 {
 	size_t adjusted_size; /* Adjusted (aligned) block size */
-	size_t extendsize	  /* Amount to extend heap if no fit */
+	size_t extendsize;	  /* Amount to extend heap if no fit */
 	char *bp;
 
 	/* Ignore stupid/ugly programmers */
@@ -189,7 +189,7 @@ void *malloc(size_t size)
 		return NULL;
 
 	/* Adjust block size to allow for header and match alignment */
-	adusted_size = ADJUST_BYTESIZE(size);
+	adjusted_size = ADJUST_BYTESIZE(size);
 
 	/* Search for a best fit */
 	if ((bp = find_fit(adjusted_size)) != NULL) {
@@ -257,7 +257,7 @@ static int calc_min_bits(size_t size)
  *
  * This differs from the example extend_heap function in that the parameter
  * passed is in BYTES rather than WORDS. Constantly converting between the two
- * is confusing and unnecessary.
+ *g is confusing and unnecessary.
  *
  * Furthermore, it should be a size already adjusted to fit byte and header
  * alignment. This method merely sets header/footer/successor as needed
@@ -300,14 +300,14 @@ static void *coalesce(void *bp)
 	else if (!prev_alloc && next_alloc) {
 		size += GET_SIZE(GET_BLOCKHDR(GET_PREVBLOCK(bp)));
 		PUTW(GET_BLOCKFTR(bp), PACK(size, 0));
-		PUTW(GET_BLOCKHDR(GET_PREVBLOCK(b)), PACK(size, 0));
+		PUTW(GET_BLOCKHDR(GET_PREVBLOCK(bp)), PACK(size, 0));
 		bp = GET_PREVBLOCK(bp);
 	}
 
 	else {
 		size += GET_SIZE(GET_BLOCKHDR(GET_PREVBLOCK(bp))) +
 		  GET_SIZE(GET_BLOCKFTR(GET_NEXTBLOCK(bp)));
-		PUTW(GET_BLOCKHDR(GET_PREVBLOCK(b)), PACK(size, 0));
+		PUTW(GET_BLOCKHDR(GET_PREVBLOCK(bp)), PACK(size, 0));
 		PUTW(GET_BLOCKFTR(GET_NEXTBLOCK(bp)), PACK(size, 0));
 		bp = GET_PREVBLOCK(bp);
 	}
@@ -335,7 +335,7 @@ static void allocate(void *bp, size_t adjusted_size)
 
 	else {
 		PUTW(GET_BLOCKHDR(bp), PACK(csize, THISALLOC | isPrevAlloc));
-		PUTW(GET_BLOCKFTR(bp), PACK(cisze, THISALLOC | isPrevAlloc));
+		PUTW(GET_BLOCKFTR(bp), PACK(csize, THISALLOC | isPrevAlloc));
 	}
 }
 
@@ -355,8 +355,8 @@ static void free_block(void *bp, size_t adjusted_size)
 	isPrevAlloc = GET_PREVALLOC(GET_BLOCKHDR(bp));
 	size = GET_SIZE(GET_BLOCKHDR(bp));
 
-	PUTW(GET_BLOCKHDR(bp), PACK(size, isPrevAlloc);
-	PUTW(GET_BLOCKFTR(bp), PACK(size, isPrevAlloc);
+	PUTW(GET_BLOCKHDR(bp), PACK(size, isPrevAlloc));
+	PUTW(GET_BLOCKFTR(bp), PACK(size, isPrevAlloc));
 
     coalesce(bp);
 }
