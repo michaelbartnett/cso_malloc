@@ -91,7 +91,7 @@ to page size. */
 
 /*  */
 #define GET_NEXTBLOCK(bp) ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))
-#define GET_PREVBLOCK(bp) ((char *)(bp) - GETSIZE(((char *)(bp) - DSIZE)))
+#define GET_PREVBLOCK(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 
 #define FREELIST_COUNT 13
 
@@ -118,10 +118,11 @@ static unsigned char * heap_start;
 static unsigned char * heap_end;
 
 static int calc_min_bits(size_t size);
-static void *extend_heap(size_t words);
+static void *extend_heap(size_t adjusted_size);
 static void *coalesce(void *bp);
 static void allocate(void *bp, size_t adjusted_size);
 static void * find_fit(size_t block_size);
+static void *find_end_of_list(int power_of_two);
 
 
 
@@ -253,6 +254,8 @@ static int calc_min_bits(size_t size)
 
 
 /**
+ * extend_heap(size_t adjusted_size)
+ *
  * Extend the heap by number of words
  *
  * This differs from the example extend_heap function in that the parameter
@@ -381,6 +384,24 @@ static void * find_fit(size_t block_size)
 	}
 	return NULL;
 }
+
+
+
+/**
+ *
+ */
+static void *find_end_of_list(int power_of_two)
+{
+	char *bp = free_lists[power_of_two];
+	char *next_bp = bp;
+
+	while (next_bp != NULL) {
+		bp = next_bp;
+		next_bp = *bp;
+	}
+	return bp;
+}
+
 
 int main(int argc, char* argv[])
 {
