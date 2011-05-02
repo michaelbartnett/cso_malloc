@@ -64,7 +64,7 @@ team_t team = {
 #define WSIZE 4
 #define DSIZE 8
 #define ALIGNMENT DSIZE
-#define MIN_SIZE 3 * WSIZE
+#define MIN_SIZE 4 * WSIZE
 
 /* rounds up to the nearest multiple of ALIGNMENT */
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
