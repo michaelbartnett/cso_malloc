@@ -35,6 +35,14 @@
 #include "mm.h"
 #include "memlib.h"
 
+#define _DEBUG
+
+#ifdef _DEBUG
+	#define TRACE(...) printf(__VA_ARGS__); fflush(stdout)
+#else
+	#define TRACE(...) ;
+#endif
+
 /*********************************************************
  * NOTE TO STUDENTS: Before you do anything else, please
  * provide your team information in the following struct.
@@ -215,6 +223,11 @@ void *mm_malloc(size_t size)
 	if (size == 0)
 		return NULL;
 
+	TRACE(">>>Running mm_malloc. size = %d\n", size);
+	if (size == 4072) {
+		TRACE("OH NO!\n");
+	}
+
 	/* Adjust block size to allow for header and match alignment */
 	adjusted_size = ADJUST_BYTESIZE(size);
 
@@ -246,6 +259,7 @@ void *mm_malloc(size_t size)
  */
 void mm_free(void *ptr)
 {
+	TRACE(">>>Entering mm_free()\n");
 }
 
 /**
@@ -253,6 +267,7 @@ void mm_free(void *ptr)
  */
 void *mm_realloc(void *ptr, size_t size)
 {
+	TRACE(">>>Entering mm_realloc()\n");
 /*
 	void *oldptr = ptr;
 	void *newptr;
@@ -305,6 +320,8 @@ static void *extend_heap(size_t adjusted_size)
 	char *bp;
 	size_t prev_alloc;
 
+	TRACE("Entering extend_heap()\n");
+
 	if ((long)(bp = mem_sbrk(adjusted_size)) == -1)
 		return NULL;
 
@@ -318,8 +335,8 @@ static void *extend_heap(size_t adjusted_size)
 	PUTW(GET_BLOCKFTR(bp), PACK(adjusted_size, prev_alloc));
 
 	/* New epilogue header */
-	PUTW(GET_BLOCKHDR(GET_NEXTBLOCK(bp)), PACK(0, THISALLOC));
-
+	PUTW(GET_BLOCKHDR(GET_NEXTBLOCK(bp)), PACK(0xDEADBEEF, THISALLOC));
+	heap_end = GET_BLOCKHDR(GET_NEXTBLOCK(bp));
 	/* Coalesce if the previous block was free */
 	return coalesce(bp); /* coalesce handles adding block to free list */
 }
@@ -338,6 +355,8 @@ static void *coalesce(void *bp)
 	size_t size = GET_SIZE(GET_BLOCKHDR(bp));
 	char *next_block = GET_NEXTBLOCK(bp);
 	char *prev_block = GET_PREVBLOCK(bp);
+
+	TRACE(">>>Entering coalesce()\n");
 
 	/* Case 1, Both blocks allocated, does not need its own if statement */
 
@@ -381,6 +400,8 @@ static void allocate(void *bp, size_t adjusted_size)
 	size_t csize = GET_SIZE(GET_BLOCKHDR(bp));
 	size_t is_prev_alloc;
 
+	TRACE(">>>Entering allocate()\n");
+
 	if ((csize - adjusted_size) >= (MIN_SIZE)) {
 		is_prev_alloc = GET_PREVALLOC(bp);
 
@@ -412,6 +433,8 @@ static void free_block(void *bp, size_t adjusted_size)
 	size_t size;
 	size_t is_prev_alloc;
 
+	TRACE(">>>Entering free_block()\n");
+
 	/* Trying to free NULL pointers will only result in chaos */
     if(bp == NULL)
 		return;
@@ -432,6 +455,7 @@ static void * find_fit(size_t block_size, int *result_index)
 		/* Make sure we search according to size & alignment requirements */
 		min_index = /*ADJUST_WORDCOUNT(*/calc_min_bits(block_size)/*)*/;
 
+	TRACE(">>>Entering find_fit()\n");
 
 	/* Look at the free list with the minimum size needed to hold block_size */
 	for (list_index = min_index; list_index < FREELIST_COUNT; list_index++) {
@@ -454,6 +478,8 @@ static void *find_end_of_list(int list_index)
 {
 	size_t *bp = (size_t *)free_lists[list_index];
 	size_t *next_bp = bp;
+
+	TRACE(">>>Entering find_end_of_list()\n");
 
 	while (next_bp != NULL) {
 		bp = next_bp;
@@ -479,6 +505,8 @@ static void remove_from_list(char *bp, int list_index) /* TODO: Might not need l
 	mem_header *header = AS_MEM_HEADER(bp);
 	mem_header *next_header;
 	mem_header *prev_header;
+
+	TRACE(">>>Entering remove_from_list()\n");
 
 	if (header->next_free != NULL) {
 		next_header = AS_MEM_HEADER(header->next_free);
@@ -512,6 +540,8 @@ static void add_to_list(char *bp, int list_index)
 	char *prev;
 	mem_header *header = AS_MEM_HEADER(bp);
 	mem_header *last_node;
+
+	TRACE(">>>Entering add_to_list()\n");
 
 	prev = find_end_of_list(list_index);
 
