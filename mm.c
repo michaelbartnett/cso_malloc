@@ -18,6 +18,14 @@
  *      allocate_block - Based on the 'place' function in CS:APP implicit free
  *    					  list example.
  */
+
+
+
+/*
+ * The To-Do list:
+ *
+ *
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -124,8 +132,8 @@ static size_t PAGE_WORDS;
 static size_t ADJUSTED_PAGESIZE;
 static size_t ADJUSTED_PAGEWORDS;
 
-static unsigned char * heap_start;
-static unsigned char * heap_end;
+static unsigned char * heap_start = NULL;
+static unsigned char * heap_end = NULL;
 
 static int calc_min_bits(size_t size);
 static void *extend_heap(size_t adjusted_size);
@@ -145,8 +153,9 @@ int mm_init(void)
 {
 	mem_init();
 
-	memset(free_lists, NULL, sizeof(free_lists));
+	memset(free_lists, (int)NULL, sizeof(free_lists));
 
+	/* Initialize write-once variables */
 	PAGE_SIZE = mem_pagesize();
 	PAGE_WORDS = PAGE_SIZE / ALIGNMENT;
 	ADJUSTED_PAGESIZE = ADJUST_BYTESIZE(PAGE_SIZE);
@@ -157,30 +166,28 @@ int mm_init(void)
 	if((heap_start = mem_sbrk(ADJUSTED_PAGESIZE + (3 * ALIGNMENT))) == NULL)
 		return -1;
 
-	heap_end = mem_heap_high();
+	/* TODO: Determine if I actually need this variable */
+	heap_end = mem_heap_hi();
 
 	/* Alignment word */
 	PUTW(heap_start, 0);
 
 	/* Prologue header */
-	PUTW(heap_start + (1 * WSIZE), PACK(DSIZE, 1));
-	PUTW(heap_start + (2 * WSIZE), PACK(DSIZE, 1));
+	PUTW(heap_start + (1 * WSIZE), PACK(0, 1));
+	PUTW(heap_start + (2 * WSIZE), PACK(0, 1));
 
 	/* Epilogue header */
 	PUTW(heap_end - WSIZE + 1, PACK(0, 1));
 
+	/* Initial free block */
+	PUTW(GET_BLOCKHDR(heap_start + (2 * ALIGNMENT)), PACK(PAGE_SIZE, 0));
+	PUTW(GET_BLOCKFTR(heap_start + (2 * ALIGNMENT)), PACK(PAGE_SIZE, 0));
 
-	block_addr = heap_start + (2 * ALIGNMENT);
-	num_bytes = PAGE_SIZE;
-
-	PUTW(GET_BLOCKHDR(block_addr), PACK(num_bytes, 0));
-	PUTW(GET_BLOCKFTR(block_addr), PACK(num_bytes, 0));
-	/* mm_maloc should check the freelists instead of traverse a free list
-	coalesce shouldn't change. Should pull this segment of code out into
-	either mm_free or a mark_free() function or macro.
-	*/
 	/* Ensure first block of free memory is aligned to */
 	free_lists[calc_min_bits(PAGE_WORDS)] = heap_start + ALIGNMENT;
+	mem_header *header = AS_MEM_HEADER(heap_start + (2 * ALIGNMENT));
+	header->prev_free = NULL;
+	header->next_free = NULL;
 
 	return 0;
 }
@@ -287,17 +294,25 @@ static int calc_min_bits(size_t size)
  * Furthermore, it should be a size already adjusted to fit byte and header
  * alignment. This method merely sets header/footer/successor as needed
  */
-static void *extend_heap(size_t adusted_size)
+static void *extend_heap(size_t adjusted_size)
 {
 	char *bp;
+	size_t prev_alloc;
 
 	if ((long)(bp = mem_sbrk(adjusted_size)) == -1)
 		return NULL;
 
 	/* Initialize free block header/footer and the epilogue header */
-	PUTW(GET_BLOCKHDR(bp), PACK(adjusted_size, 0));			  /* Free block header */
-	PUTW(GET_BLOCKFTR(bp), PACK(adjusted_size, 0));			  /* Free block header */
-	PUTW(GET_BLOCKHDR(GET_NEXTBLOCK(bp)), PACK(0, THISALLOC)); /* New epilogue header */
+	prev_alloc = GET_PREVALLOC(bp);
+
+	/* Free block header */
+	PUTW(GET_BLOCKHDR(bp), PACK(adjusted_size, prev_alloc));
+
+	/* Free block header */
+	PUTW(GET_BLOCKFTR(bp), PACK(adjusted_size, prev_alloc));
+
+	/* New epilogue header */
+	PUTW(GET_BLOCKHDR(GET_NEXTBLOCK(bp)), PACK(0, THISALLOC));
 
 	/* Coalesce if the previous block was free */
 	return coalesce(bp); /* coalesce handles adding block to free list */
@@ -318,12 +333,9 @@ static void *coalesce(void *bp)
 	char *next_block = GET_NEXTBLOCK(bp);
 	char *prev_block = GET_PREVBLOCK(bp);
 
-	if (prev_alloc && next_alloc) { /* Both allocated */
-		/*add_to_list(bp, calc_min_bits(GET_SIZE(GET_BLOCKHDR(bp));*/
-		/*return bp;*/ /* Unnecessary. TODO: Delete this */
-	}
+	/* Case 1, Both blocks allocated, does not need its own if statement */
 
-	else if (prev_alloc && !next_alloc) { /* next_block is free */
+	if (prev_alloc && !next_alloc) { /* next_block is free */
 		remove_from_list(next_block, calc_min_bits(GET_SIZE(next_block)));
 
 		size += GET_SIZE(GET_BLOCKHDR(GET_NEXTBLOCK(bp)));
@@ -340,7 +352,7 @@ static void *coalesce(void *bp)
 		bp = GET_PREVBLOCK(bp);
 	}
 
-	else { /* Both blocks are free */
+	else if (!prev_alloc && !next_alloc) { /* Both blocks are free */
 		remove_from_list(next_block, calc_min_bits(GET_SIZE(next_block)));
 		remove_from_list(prev_block, calc_min_bits(GET_SIZE(prev_block)));
 
@@ -350,7 +362,6 @@ static void *coalesce(void *bp)
 		PUTW(GET_BLOCKFTR(GET_NEXTBLOCK(bp)), PACK(size, 0));
 		bp = GET_PREVBLOCK(bp);
 	}
-
 
 	add_to_list(bp, calc_min_bits(size));
 	return bp;
@@ -415,7 +426,7 @@ static void * find_fit(size_t block_size)
 {
 	int list_index,
 		/* Make sure we search according to size & alignment requirements */
-		min_index = ALIGNW_ODD(calc_min_bits(block_size)); /* TODO: Fix the units here */
+		min_index = ADJUST_WORDSIZE(calc_min_bits(block_size));
 
 
 	/* Look at the free list with the minimum size needed to hold block_size */
@@ -436,12 +447,12 @@ static void * find_fit(size_t block_size)
  */
 static void *find_end_of_list(int list_index)
 {
-	char *bp = free_lists[power_of_two];
-	char *next_bp = bp;
+	size_t *bp = (size_t *)free_lists[list_index];
+	size_t *next_bp = bp;
 
 	while (next_bp != NULL) {
 		bp = next_bp;
-		next_bp = *bp;
+		next_bp = (size_t *)(*((size_t *)bp)); /* TODO: Make sure this is the right syntax */
 	}
 	return bp;
 }
@@ -473,12 +484,14 @@ static void remove_from_list(char *bp, int list_index)
 	}
 
 	/* Default case */
-	/* Find the previous header (since we didn't have it before) */
-	prev_header = AS_MEM_HEADER(header->prev_free);
 
 	/* Make the prev_free and next_free of the previous and next list items
 	 * point to each other's payload. */
-	prev_header->next_free = header->next_free;
+/*	if (header->prev_free != NULL) { /* Don't access invalid memory */
+	/* Find the previous header (since we didn't have it before) */
+		prev_header = AS_MEM_HEADER(header->prev_free);
+		prev_header->next_free = header->next_free;
+	/*}*/
 	next_header->prev_free = header->prev_free;
 }
 
@@ -509,7 +522,10 @@ static void add_to_list(char *bp, int list_index)
 }
 
 
+/*
 int main(int argc, char* argv[])
 {
 	return 0;
 }
+*/
+
