@@ -94,9 +94,9 @@ to page size. */
 /* Read <allocated?> field */
 #define GET_ALLOC(p) (GETW(p) & THISALLOC)
 /* Read <previous allocated?> field */
-#define GET_PREVALLOC(p) ((GETW(p) & PREVALLOC))
+#define GET_PREVALLOC(bp) ((GETW(GET_BLOCKHDR(bp)) & PREVALLOC))
 /* Read <next allocated?> field */
-#define GET_NEXTALLOC(p) (GET_ALLOC(GET_BLOCKHDR(GET_NEXTBLOCK(p))))
+#define GET_NEXTALLOC(bp) (GET_ALLOC(GET_BLOCKHDR(GET_NEXTBLOCK(bp))))
 
 /* Get address of header and footer */
 #define GET_BLOCKHDR(bp) ((char *)(bp) - WSIZE)
@@ -108,9 +108,11 @@ to page size. */
 
 #define FREELIST_COUNT 13
 
-/* This implementation requires that block sizes be odd and >= 3 words */
-#define ADJUST_WORDSIZE(size) ((size) < 3 ? 3 : (size) + (((size) % 2) ^ 0x01))
-#define ADJUST_BYTESIZE(size) ((ADJUST_WORDSIZE(((size) + WSIZE - 1)/WSIZE)) * WSIZE)
+/* This implementation requires that block sizes be odd and >= 3 words
+ * ALIGN_WORDCOUNT aligns to word alignment requirement, whereas
+ * ADJUST_BYTESIZE aligns to proper ALIGNMENT in bytes */
+#define ADJUST_WORDCOUNT(size) ((size) < 3 ? 3 : (size) + (((size) % 2) ^ 0x01))
+#define ADJUST_BYTESIZE(size) (ALIGN((ADJUST_WORDCOUNT(((size) + WSIZE - 1)/WSIZE)) * WSIZE))
 
 
 
@@ -128,21 +130,20 @@ typedef struct {			/* IMPORTANT!!! The next_free and prev_free fields*/
 } mem_header;
 
 static size_t PAGE_SIZE;
-static size_t PAGE_WORDS;
 static size_t ADJUSTED_PAGESIZE;
-static size_t ADJUSTED_PAGEWORDS;
 
-static unsigned char * heap_start = NULL;
-static unsigned char * heap_end = NULL;
+static char * heap_start = NULL;
+static char * heap_end = NULL;
 
 static int calc_min_bits(size_t size);
 static void *extend_heap(size_t adjusted_size);
 static void *coalesce(void *bp);
 static void allocate(void *bp, size_t adjusted_size);
-static void * find_fit(size_t block_size);
+static void *find_fit(size_t block_size, int *result_index);
 static void *find_end_of_list(int list_index);
 static void add_to_list(char *bp, int list_index);
 static void remove_from_list(char *bp, int list_index);
+static void free_block(void *bp, size_t adjusted_size);
 
 
 
@@ -157,37 +158,43 @@ int mm_init(void)
 
 	/* Initialize write-once variables */
 	PAGE_SIZE = mem_pagesize();
-	PAGE_WORDS = PAGE_SIZE / ALIGNMENT;
 	ADJUSTED_PAGESIZE = ADJUST_BYTESIZE(PAGE_SIZE);
-	ADJUSTED_PAGEWORDS = ADJUST_WORDSIZE(PAGE_WORDS);
 
 	/* Initially allocate 1 page of memory plus room for
 		the prologue and epilogue blocks and free block header */
-	if((heap_start = mem_sbrk(ADJUSTED_PAGESIZE + (3 * ALIGNMENT))) == NULL)
+	if((heap_start = mem_sbrk(ADJUSTED_PAGESIZE + (3 * WSIZE))) == NULL)
 		return -1;
 
 	/* TODO: Determine if I actually need this variable */
 	heap_end = mem_heap_hi();
+	PUTW(heap_end-3, 0xCAFEBABE);
 
 	/* Alignment word */
-	PUTW(heap_start, 0);
+	PUTW(heap_start, 0x8BADF00D);
 
 	/* Prologue header */
-	PUTW(heap_start + (1 * WSIZE), PACK(0, 1));
-	PUTW(heap_start + (2 * WSIZE), PACK(0, 1));
+	PUTW(heap_start + (1 * WSIZE), PACK(DSIZE, THISALLOC | PREVALLOC));
+	PUTW(heap_start + (2 * WSIZE), PACK(DSIZE, THISALLOC | PREVALLOC));
 
 	/* Epilogue header */
-	PUTW(heap_end - WSIZE + 1, PACK(0, 1));
+	PUTW(heap_end - WSIZE + 1, PACK(0, THISALLOC));
 
-	/* Initial free block */
+	/* Setup initial free block */
+	PUTW(heap_start + (3 * WSIZE), PACK(ADJUSTED_PAGESIZE, PREVALLOC));
+	PUTW((heap_end - WSIZE + 1) - WSIZE, PACK(ADJUSTED_PAGESIZE, PREVALLOC));
+	add_to_list(heap_start + (4 * WSIZE), calc_min_bits(ADJUSTED_PAGESIZE));
+
+/*
 	PUTW(GET_BLOCKHDR(heap_start + (2 * ALIGNMENT)), PACK(PAGE_SIZE, 0));
 	PUTW(GET_BLOCKFTR(heap_start + (2 * ALIGNMENT)), PACK(PAGE_SIZE, 0));
 
-	/* Ensure first block of free memory is aligned to */
+	/* Ensure first block of free memory is aligned to * /
 	free_lists[calc_min_bits(PAGE_WORDS)] = heap_start + ALIGNMENT;
 	mem_header *header = AS_MEM_HEADER(heap_start + (2 * ALIGNMENT));
 	header->prev_free = NULL;
 	header->next_free = NULL;
+*/
+
 
 	return 0;
 }
@@ -202,6 +209,7 @@ void *mm_malloc(size_t size)
 {
 	size_t adjusted_size; /* Adjusted (aligned) block size */
 	char *bp;
+	int list_index;
 
 	/* Ignore stupid/ugly programmers */
 	if (size == 0)
@@ -211,12 +219,12 @@ void *mm_malloc(size_t size)
 	adjusted_size = ADJUST_BYTESIZE(size);
 
 	/* Search for a best fit */
-	if ((bp = find_fit(adjusted_size)) != NULL) {
+	if ((bp = find_fit(adjusted_size, &list_index)) != NULL) {
 		/* Mark block as allocated, write header info */
 		allocate(bp, adjusted_size);
 
 		/* Remove this block from its respective free list */
-		remove_from_list(bp, calc_min_bits(adjusted_size));
+		remove_from_list(bp, list_index);
 
 		return bp;
 	}
@@ -399,7 +407,7 @@ static void allocate(void *bp, size_t adjusted_size)
 
 
 /** TODO: Better comment
- * Mark block at specified address as free and coalesce
+ * Mark block at specified address as free
  */
 static void free_block(void *bp, size_t adjusted_size)
 {
@@ -410,29 +418,28 @@ static void free_block(void *bp, size_t adjusted_size)
     if(bp == NULL)
 		return;
 
-	is_prev_alloc = GET_PREVALLOC(GET_BLOCKHDR(bp));
+	is_prev_alloc = GET_PREVALLOC(bp);
 	size = GET_SIZE(GET_BLOCKHDR(bp));
 
 	PUTW(GET_BLOCKHDR(bp), PACK(size, is_prev_alloc));
 	PUTW(GET_BLOCKFTR(bp), PACK(size, is_prev_alloc));
-
-    coalesce(bp);
 }
 
 /** TODO: Better comment
  * Find a free block of memory of size block_size
  */
-static void * find_fit(size_t block_size)
+static void * find_fit(size_t block_size, int *result_index)
 {
 	int list_index,
 		/* Make sure we search according to size & alignment requirements */
-		min_index = ADJUST_WORDSIZE(calc_min_bits(block_size));
+		min_index = /*ADJUST_WORDCOUNT(*/calc_min_bits(block_size)/*)*/;
 
 
 	/* Look at the free list with the minimum size needed to hold block_size */
 	for (list_index = min_index; list_index < FREELIST_COUNT; list_index++) {
 		/* If the head of the list is not null, we can use it */
 		if (free_lists[list_index] != NULL) {
+			*result_index = list_index;
 			return (void *)free_lists[list_index];
 		}
 		/* Otherwise, we can't */
@@ -469,30 +476,25 @@ static void *find_end_of_list(int list_index)
  * 	  bp - Pointer to the payload
  * 	  list_index - The free list index (power of two representing word size)
  */
-static void remove_from_list(char *bp, int list_index)
+static void remove_from_list(char *bp, int list_index) /* TODO: Might not need list_index param */
 {
 	mem_header *header = AS_MEM_HEADER(bp);
-	mem_header *next_header = AS_MEM_HEADER(header->next_free);
+	mem_header *next_header;
 	mem_header *prev_header;
 
-	/* Case where block is head of list */
-	if (free_lists[list_index] == bp) {
-		free_lists[list_index] = header->next_free;
-		next_header->prev_free = NULL;
-
-		return;
+	if (header->next_free != NULL) {
+		next_header = AS_MEM_HEADER(header->next_free);
+		next_header->prev_free = header->prev_free;
 	}
 
-	/* Default case */
-
-	/* Make the prev_free and next_free of the previous and next list items
-	 * point to each other's payload. */
-/*	if (header->prev_free != NULL) { /* Don't access invalid memory */
-	/* Find the previous header (since we didn't have it before) */
+	if (header->prev_free != NULL) {
 		prev_header = AS_MEM_HEADER(header->prev_free);
 		prev_header->next_free = header->next_free;
-	/*}*/
-	next_header->prev_free = header->prev_free;
+	}
+
+	if (free_lists[list_index] == bp) {
+		free_lists[list_index] = header->next_free;
+	}
 }
 
 
@@ -514,6 +516,14 @@ static void add_to_list(char *bp, int list_index)
 	mem_header *last_node;
 
 	prev = find_end_of_list(list_index);
+
+	if (prev == NULL) {
+		free_lists[list_index] = bp;
+		header->next_free = NULL;
+		header->prev_free = NULL;
+		return;
+	}
+
 	last_node = AS_MEM_HEADER(prev);
 
 	last_node->next_free = bp;

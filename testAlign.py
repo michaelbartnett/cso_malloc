@@ -13,7 +13,7 @@ def alignment_test():
 		print(str(i) + " = " + str(align_size(i)))
 
 if __name__ == '__main__':
-	print 'Running alignment test . . .'
-	alignment_test()
-else:
-	print 'Main is not working as you expect.'
+#	print 'Running alignment test . . .'
+#	alignment_test()
+	print "Aligning 4096"
+	print str(align_size(4096))
