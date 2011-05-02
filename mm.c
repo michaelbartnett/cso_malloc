@@ -10,7 +10,6 @@
  * was not. I make no effort to indicate which lines are taken from the text--
  * I feel my code is different enough to make this unnecessary.
  *
- * Public Functions
 
 
  * Private Functions:
@@ -71,6 +70,8 @@ to page size. */
 #define THISALLOC 0x01
 #define PREVALLOC 0x01 << 1
 
+#define MAX(a, b)	((a > b) ? (a) : (b))
+
 /* Read and write word value at address 'p' */
 #define GETW(p) (*(unsigned int *)(p))
 #define PUTW(p, val) (*(unsigned int *)(p) = (val))
@@ -91,7 +92,7 @@ to page size. */
 
 /*  */
 #define GET_NEXTBLOCK(bp) ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))
-#define GET_PREVBLOCK(bp) ((char *)(bp) - GETSIZE(((char *)(bp) - DSIZE)))
+#define GET_PREVBLOCK(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 
 #define FREELIST_COUNT 13
 
@@ -144,14 +145,14 @@ int mm_init(void)
 	if((heap_start = mem_sbrk(ADJUSTED_PAGESIZE + (3 * ALIGNMENT))) == NULL)
 		return -1;
 
-	heap_end = mem_heap_high();
+	heap_end = mem_heap_hi();
 
 	/* Alignment word */
 	PUTW(heap_start, 0);
 
 	/* Prologue Block header */
-	PUTW(heapstart + (1 * WSIZE), PACK(DISZE, 1));
-	PUTW(heapstart + (2 * WSIZE), PACK(DSIZE, 1));
+	PUTW(heap_start + (1 * WSIZE), PACK(DSIZE, 1));
+	PUTW(heap_start + (2 * WSIZE), PACK(DSIZE, 1));
 
 	/* Epilogue Block header */
 	PUTW(heap_end - WSIZE + 1, PACK(0, 1));
@@ -189,7 +190,7 @@ void *malloc(size_t size)
 		return NULL;
 
 	/* Adjust block size to allow for header and match alignment */
-	adusted_size = ADJUST_BYTESIZE(size);
+	adjusted_size = ADJUST_BYTESIZE(size);
 
 	/* Search for a best fit */
 	if ((bp = find_fit(adjusted_size)) != NULL) {
@@ -267,9 +268,9 @@ static void *extend_heap(size_t words)
 		return NULL;
 
 	/* Initialize free block header/footer and the epilogue header */
-	PUT(GET_BLOCKHDR(bp), PACK(size, 0));			  /* Free block header */
-	PUT(GET_BLOCKFTR(bp), PACK(size), 0));			  /* Free block header */
-	PUT(GET_BLOCKHDR(GET_NEXTBLOCK(bp)), PACK(0, 1)); /* New epilogue header */
+	PUTW(GET_BLOCKHDR(bp), PACK(size, 0));			  /* Free block header */
+	PUTW(GET_BLOCKFTR(bp), PACK(size, 0));			  /* Free block header */
+	PUTW(GET_BLOCKHDR(GET_NEXTBLOCK(bp)), PACK(0, 1)); /* New epilogue header */
 
 
 
@@ -293,20 +294,19 @@ static void *coalesce(void *bp)
 	else if (prev_alloc && !next_alloc) {
 		size += GET_SIZE(GET_BLOCKHDR(GET_NEXTBLOCK(bp)));
 		PUTW(GET_BLOCKHDR(bp), PACK(size, 0));
-		PUT(GET_BLOCKFTR(bp), PACK(size, 0));
+		PUTW(GET_BLOCKFTR(bp), PACK(size, 0));
 	}
 
 	else if (!prev_alloc && next_alloc) {
 		size += GET_SIZE(GET_BLOCKHDR(GET_PREVBLOCK(bp)));
 		PUTW(GET_BLOCKFTR(bp), PACK(size, 0));
-		PUTW(GET_BLOCKHDR(GET_PREVBLOCK(b)), PACK(size, 0));
+		PUTW(GET_BLOCKHDR(GET_PREVBLOCK(bp)), PACK(size, 0));
 		bp = GET_PREVBLOCK(bp);
 	}
 
 	else {
-		size += GET_SIZE(GET_BLOCKHDR(GET_PREVBLOCK(bp))) +
-		  GET_SIZE(GET_BLOCKFTR(GET_NEXTBLOCK(bp)));
-		PUTW(GET_BLOCKHDR(GET_PREVBLOCK(b)), PACK(size, 0));
+		size += GET_SIZE(GET_BLOCKHDR(GET_PREVBLOCK(bp))) + GET_SIZE(GET_BLOCKFTR(GET_NEXTBLOCK(bp)));
+		PUTW(GET_BLOCKHDR(GET_PREVBLOCK(bp)), PACK(size, 0));
 		PUTW(GET_BLOCKFTR(GET_NEXTBLOCK(bp)), PACK(size, 0));
 		bp = GET_PREVBLOCK(bp);
 	}
@@ -334,7 +334,7 @@ static void allocate(void *bp, size_t adjusted_size)
 
 	else {
 		PUTW(GET_BLOCKHDR(bp), PACK(csize, THISALLOC | isPrevAlloc));
-		PUTW(GET_BLOCKFTR(bp), PACK(cisze, THISALLOC | isPrevAlloc));
+		PUTW(GET_BLOCKFTR(bp), PACK(csize, THISALLOC | isPrevAlloc));
 	}
 }
 
@@ -352,8 +352,8 @@ static void free_block(void *bp, size_t adjusted_size)
 	isPrevAlloc = GET_PREVALLOC(GET_BLOCKHDR(bp));
 	size = GET_SIZE(GET_BLOCKHDR(bp));
 
-	PUTW(GET_BLOCKHDR(bp), PACK(size, isPrevAlloc);
-	PUTW(GET_BLOCKFTR(bp), PACK(size, isPrevAlloc);
+	PUTW(GET_BLOCKHDR(bp), PACK(size, isPrevAlloc));
+	PUTW(GET_BLOCKFTR(bp), PACK(size, isPrevAlloc));
 
     coalesce(bp);
 }
@@ -377,9 +377,4 @@ static void * find_fit(size_t block_size)
 		/* Otherwise, we can't */
 	}
 	return NULL;
-}
-
-int main(int argc, char* argv[])
-{
-
 }
