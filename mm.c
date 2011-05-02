@@ -41,7 +41,7 @@ team_t team = {
 	/* Second member's full name (leave blank if none) */
 	"Nabil Hassein",
 	/* Second member's email address (leave blank if none) */
-	""
+	"nah285"
 };
 
 /* single word (4) or double word (8) alignment */
@@ -102,7 +102,7 @@ to page size. */
 
 
 /* Using size segregated explicit free lists */
-static CHUNK * free_lists[FREELIST_COUNT] /* Segregate by word size power of 2, up to 4096 words */
+static char * free_lists[FREELIST_COUNT] /* Segregate by word size power of 2, up to 4096 words */
 
 typedef struct {
 	unsigned int size_alloc;
@@ -160,8 +160,8 @@ int mm_init(void)
 	block_addr = heap_start + (2 * ALIGNMENT);
 	num_bytes = PAGE_SIZE;
 
-	PUTW(GET_BLOCKHDR(chunk_addr), PACK(num_bytes, 0));
-	PUTW(GET_BLOCKFTR(chunk)addr), PACK(num_bytes, 0));
+	PUTW(GET_BLOCKHDR(block_addr), PACK(num_bytes, 0));
+	PUTW(GET_BLOCKFTR(block_addr), PACK(num_bytes, 0));
 	/* mm_maloc should check the freelists instead of traverse a free list
 	coalesce shouldn't change. Should pull this segment of code out into
 	either mm_free or a mark_free() function or macro.
@@ -258,7 +258,7 @@ static int calc_min_bits(size_t size)
 static void *extend_heap(size_t words)
 {
 	char *bp;
-	size_t size;
+	size_t adjusted_size;
 
 	/* Allocate an even number of words to maintain alignment */
 	size = (words %2) ? (words + 1) * WSIZE : words * WSIZE;
@@ -320,7 +320,7 @@ static void *coalesce(void *bp)
 static void allocate(void *bp, size_t adjusted_size)
 {
 	size_t csize = GET_SIZE(GET_BLOCKHDR(bp));
-	int isPrevAlloc;
+	unsigned int isPrevAlloc;
 
 	if ((csize - adjusted_size) >= (MIN_SIZE)) {
 		isPrevAlloc = GET_PREVALLOC(bp);
@@ -336,6 +336,26 @@ static void allocate(void *bp, size_t adjusted_size)
 		PUTW(GET_BLOCKHDR(bp), PACK(csize, THISALLOC | isPrevAlloc));
 		PUTW(GET_BLOCKFTR(bp), PACK(cisze, THISALLOC | isPrevAlloc));
 	}
+}
+
+
+
+static void free_block(void *bp, size_t adjusted_size)
+{
+	size_t size;
+	unsigned int isPrevAlloc;
+
+	/* Trying to free NULL pointers will only result in chaos */
+    if(bp == NULL)
+		return;
+
+	isPrevAlloc = GET_PREVALLOC(GET_BLOCKHDR(bp));
+	size = GET_SIZE(GET_BLOCKHDR(bp));
+
+	PUTW(GET_BLOCKHDR(bp), PACK(size, isPrevAlloc);
+	PUTW(GET_BLOCKFTR(bp), PACK(size, isPrevAlloc);
+
+    coalesce(bp);
 }
 
 /**
