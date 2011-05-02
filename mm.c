@@ -112,6 +112,7 @@ typedef struct {
 static size_t PAGE_SIZE;
 static size_t PAGE_WORDS;
 static size_t ADJUSTED_PAGESIZE;
+static size_t ADJUSTED_PAGEWORDS;
 
 static unsigned char * heap_start;
 static unsigned char * heap_end;
@@ -136,10 +137,11 @@ int mm_init(void)
 	PAGE_SIZE = mem_pagesize();
 	PAGE_WORDS = PAGE_SIZE / ALIGNMENT;
 	ADJUSTED_PAGESIZE = ADJUST_BYTESIZE(PAGE_SIZE);
+	ADJUSTED_PAGEWORDS = ADJUST_WORDSIZE(PAGE_WORDS);
 
 	/* Initially allocate 1 page of memory plus room for
 		the prologue and epilogue blocks and free block header */
-	if((heap_start = mem_sbrk(PAGE_SIZE + (3 * ALIGNMENT))) == NULL)
+	if((heap_start = mem_sbrk(ADJUSTED_PAGESIZE + (3 * ALIGNMENT))) == NULL)
 		return -1;
 
 	heap_end = mem_heap_high();
@@ -187,7 +189,7 @@ void *malloc(size_t size)
 		return NULL;
 
 	/* Adjust block size to allow for header and match alignment */
-	adusted_size = FIX_BYTESIZE(size);
+	adusted_size = ADJUST_BYTESIZE(size);
 
 	/* Search for a best fit */
 	if ((bp = find_fit(adjusted_size)) != NULL) {
@@ -217,6 +219,7 @@ void mm_free(void *ptr)
  */
 void *mm_realloc(void *ptr, size_t size)
 {
+/*
 	void *oldptr = ptr;
 	void *newptr;
 	size_t copySize;
@@ -230,6 +233,9 @@ void *mm_realloc(void *ptr, size_t size)
 	memcpy(newptr, oldptr, copySize);
 	mm_free(oldptr);
 	return newptr;
+
+*/
+	return NULL;
 }
 
 
@@ -256,6 +262,7 @@ static void *extend_heap(size_t words)
 
 	/* Allocate an even number of words to maintain alignment */
 	size = (words %2) ? (words + 1) * WSIZE : words * WSIZE;
+
 	if ((long)(bp = mem_sbrk(size)) == -1)
 		return NULL;
 
@@ -263,6 +270,8 @@ static void *extend_heap(size_t words)
 	PUT(GET_BLOCKHDR(bp), PACK(size, 0));			  /* Free block header */
 	PUT(GET_BLOCKFTR(bp), PACK(size), 0));			  /* Free block header */
 	PUT(GET_BLOCKHDR(GET_NEXTBLOCK(bp)), PACK(0, 1)); /* New epilogue header */
+
+
 
 	/* Coalesce if the previous block was free */
 	return coalesce(bp);
