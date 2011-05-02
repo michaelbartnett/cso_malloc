@@ -10,6 +10,7 @@
  * was not. I make no effort to indicate which lines are taken from the text--
  * I feel my code is different enough to make this unnecessary.
  *
+ * Public Functions
 
 
  * Private Functions:
@@ -68,9 +69,7 @@ to page size. */
 #endif
 
 #define THISALLOC 0x01
-#define PREVALLOC 0x01 << 1
-
-#define MAX(a, b)	((a > b) ? (a) : (b))
+#define PREVALLOC (0x01 << 1)
 
 /* Read and write word value at address 'p' */
 #define GETW(p) (*(unsigned int *)(p))
@@ -92,7 +91,7 @@ to page size. */
 
 /*  */
 #define GET_NEXTBLOCK(bp) ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))
-#define GET_PREVBLOCK(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
+#define GET_PREVBLOCK(bp) ((char *)(bp) - GETSIZE(((char *)(bp) - DSIZE)))
 
 #define FREELIST_COUNT 13
 
@@ -103,7 +102,7 @@ to page size. */
 
 
 /* Using size segregated explicit free lists */
-static char * free_lists[FREELIST_COUNT] /* Segregate by word size power of 2, up to 4096 words */
+static char * free_lists[FREELIST_COUNT]; /* Segregate by word size power of 2, up to 4096 words */
 
 typedef struct {
 	unsigned int size_alloc;
@@ -145,7 +144,7 @@ int mm_init(void)
 	if((heap_start = mem_sbrk(ADJUSTED_PAGESIZE + (3 * ALIGNMENT))) == NULL)
 		return -1;
 
-	heap_end = mem_heap_hi();
+	heap_end = mem_heap_high();
 
 	/* Alignment word */
 	PUTW(heap_start, 0);
@@ -190,7 +189,7 @@ void *malloc(size_t size)
 		return NULL;
 
 	/* Adjust block size to allow for header and match alignment */
-	adjusted_size = ADJUST_BYTESIZE(size);
+	adusted_size = ADJUST_BYTESIZE(size);
 
 	/* Search for a best fit */
 	if ((bp = find_fit(adjusted_size)) != NULL) {
@@ -255,24 +254,25 @@ static int calc_min_bits(size_t size)
 
 /**
  * Extend the heap by number of words
+ *
+ * This differs from the example extend_heap function in that the parameter
+ * passed is in BYTES rather than WORDS. Constantly converting between the two
+ * is confusing and unnecessary.
+ *
+ * Furthermore, it should be a size already adjusted to fit byte and header
+ * alignment. This method merely sets header/footer/successor as needed
  */
-static void *extend_heap(size_t words)
+static void *extend_heap(size_t adusted_size)
 {
 	char *bp;
-	size_t adjusted_size;
-
-	/* Allocate an even number of words to maintain alignment */
-	size = (words %2) ? (words + 1) * WSIZE : words * WSIZE;
 
 	if ((long)(bp = mem_sbrk(size)) == -1)
 		return NULL;
 
 	/* Initialize free block header/footer and the epilogue header */
-	PUTW(GET_BLOCKHDR(bp), PACK(size, 0));			  /* Free block header */
-	PUTW(GET_BLOCKFTR(bp), PACK(size, 0));			  /* Free block header */
-	PUTW(GET_BLOCKHDR(GET_NEXTBLOCK(bp)), PACK(0, 1)); /* New epilogue header */
-
-
+	PUTW(GET_BLOCKHDR(bp), PACK(adjusted_size, 0));			  /* Free block header */
+	PUTW(GET_BLOCKFTR(bp), PACK(adjusted_size, 0));			  /* Free block header */
+	PUTW(GET_BLOCKHDR(GET_NEXTBLOCK(bp)), PACK(0, THISALLOC)); /* New epilogue header */
 
 	/* Coalesce if the previous block was free */
 	return coalesce(bp);
@@ -294,19 +294,20 @@ static void *coalesce(void *bp)
 	else if (prev_alloc && !next_alloc) {
 		size += GET_SIZE(GET_BLOCKHDR(GET_NEXTBLOCK(bp)));
 		PUTW(GET_BLOCKHDR(bp), PACK(size, 0));
-		PUTW(GET_BLOCKFTR(bp), PACK(size, 0));
+		PUT(GET_BLOCKFTR(bp), PACK(size, 0));
 	}
 
 	else if (!prev_alloc && next_alloc) {
 		size += GET_SIZE(GET_BLOCKHDR(GET_PREVBLOCK(bp)));
 		PUTW(GET_BLOCKFTR(bp), PACK(size, 0));
-		PUTW(GET_BLOCKHDR(GET_PREVBLOCK(bp)), PACK(size, 0));
+		PUTW(GET_BLOCKHDR(GET_PREVBLOCK(b)), PACK(size, 0));
 		bp = GET_PREVBLOCK(bp);
 	}
 
 	else {
-		size += GET_SIZE(GET_BLOCKHDR(GET_PREVBLOCK(bp))) + GET_SIZE(GET_BLOCKFTR(GET_NEXTBLOCK(bp)));
-		PUTW(GET_BLOCKHDR(GET_PREVBLOCK(bp)), PACK(size, 0));
+		size += GET_SIZE(GET_BLOCKHDR(GET_PREVBLOCK(bp))) +
+		  GET_SIZE(GET_BLOCKFTR(GET_NEXTBLOCK(bp)));
+		PUTW(GET_BLOCKHDR(GET_PREVBLOCK(b)), PACK(size, 0));
 		PUTW(GET_BLOCKFTR(GET_NEXTBLOCK(bp)), PACK(size, 0));
 		bp = GET_PREVBLOCK(bp);
 	}
@@ -334,12 +335,14 @@ static void allocate(void *bp, size_t adjusted_size)
 
 	else {
 		PUTW(GET_BLOCKHDR(bp), PACK(csize, THISALLOC | isPrevAlloc));
-		PUTW(GET_BLOCKFTR(bp), PACK(csize, THISALLOC | isPrevAlloc));
+		PUTW(GET_BLOCKFTR(bp), PACK(cisze, THISALLOC | isPrevAlloc));
 	}
 }
 
 
-
+/**
+ * Mark block at specified address as free and coalesce
+ */
 static void free_block(void *bp, size_t adjusted_size)
 {
 	size_t size;
@@ -352,8 +355,8 @@ static void free_block(void *bp, size_t adjusted_size)
 	isPrevAlloc = GET_PREVALLOC(GET_BLOCKHDR(bp));
 	size = GET_SIZE(GET_BLOCKHDR(bp));
 
-	PUTW(GET_BLOCKHDR(bp), PACK(size, isPrevAlloc));
-	PUTW(GET_BLOCKFTR(bp), PACK(size, isPrevAlloc));
+	PUTW(GET_BLOCKHDR(bp), PACK(size, isPrevAlloc);
+	PUTW(GET_BLOCKFTR(bp), PACK(size, isPrevAlloc);
 
     coalesce(bp);
 }
@@ -365,7 +368,7 @@ static void * find_fit(size_t block_size)
 {
 	int list_index,
 		/* Make sure we search according to size & alignment requirements */
-		min_index = ALIGNW_ODD(calc_min_bits(block_size));
+		min_index = ALIGNW_ODD(calc_min_bits(block_size)); /* TODO: Fix the units here */
 
 
 	/* Look at the free list with the minimum size needed to hold block_size */
@@ -377,4 +380,9 @@ static void * find_fit(size_t block_size)
 		/* Otherwise, we can't */
 	}
 	return NULL;
+}
+
+int main(int argc, char* argv[])
+{
+
 }
