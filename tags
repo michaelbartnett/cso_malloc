@@ -4,8 +4,8 @@
 !_TAG_PROGRAM_NAME	Exuberant Ctags	//
 !_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
 !_TAG_PROGRAM_VERSION	5.7	//
-ADJUSTED_PAGESIZE	mm.c	120;"	v	line:120	file:
-ADJUSTED_PAGEWORDS	mm.c	121;"	v	line:121	file:
+ADJUSTED_PAGESIZE	mm.c	122;"	v	line:122	file:
+ADJUSTED_PAGEWORDS	mm.c	123;"	v	line:123	file:
 ADJUST_BYTESIZE	mm.c	103;"	d	line:103	file:
 ADJUST_WORDSIZE	mm.c	102;"	d	line:102	file:
 ALIGN	mm.c	54;"	d	line:54	file:
@@ -53,8 +53,8 @@ Mhz	fsecs.c	11;"	v	line:11	file:
 NEVENT	clock.c	208;"	d	line:208	file:
 OBJS	Makefile	12;"	m	line:12
 PACK	mm.c	82;"	d	line:82	file:
-PAGE_SIZE	mm.c	118;"	v	line:118	file:
-PAGE_WORDS	mm.c	119;"	v	line:119	file:
+PAGE_SIZE	mm.c	120;"	v	line:120	file:
+PAGE_WORDS	mm.c	121;"	v	line:121	file:
 PREVALLOC	mm.c	72;"	d	line:72	file:
 PUTW	mm.c	79;"	d	line:79	file:
 REALLOC	mdriver.c	49;"	e	line:49	enum:__anon1::__anon2	file:
@@ -74,21 +74,22 @@ __CONFIG_H_	config.h	2;"	d	line:2
 access_counter	clock.c	38;"	f	line:38	signature:(unsigned *hi, unsigned *lo)
 add_range	mdriver.c	366;"	f	line:366	file:	signature:(range_t **ranges, char *lo, int size, int tracenum, int opnum)
 add_sample	fcyc.c	67;"	f	line:67	file:	signature:(double val)
+add_to_list	mm.c	474;"	f	line:474	file:	signature:(char *bp, int list_index)
 align_size	testAlign.py	4;"	f	line:4	access:public
 alignment_test	testAlign.py	11;"	f	line:11	access:public
-allocate	mm.c	337;"	f	line:337	file:	signature:(void *bp, size_t adjusted_size)
+allocate	mm.c	341;"	f	line:341	file:	signature:(void *bp, size_t adjusted_size)
 app_error	mdriver.c	998;"	f	line:998	signature:(char *msg)
 block_sizes	mdriver.c	62;"	m	line:62	struct:__anon3	file:	access:public
 blocks	mdriver.c	61;"	m	line:61	struct:__anon3	file:	access:public
 cache_block	fcyc.c	32;"	v	line:32	file:
 cache_buf	fcyc.c	34;"	v	line:34	file:
 cache_bytes	fcyc.c	31;"	v	line:31	file:
-calc_min_bits	mm.c	257;"	f	line:257	file:	signature:(size_t size)
+calc_min_bits	mm.c	261;"	f	line:261	file:	signature:(size_t size)
 callibrate	clock.c	213;"	f	line:213	file:	signature:(int verbose)
 clear	fcyc.c	104;"	f	line:104	file:
 clear_cache	fcyc.c	30;"	v	line:30	file:
 clear_ranges	mdriver.c	440;"	f	line:440	file:	signature:(range_t **ranges)
-coalesce	mm.c	300;"	f	line:300	file:	signature:(void *bp)
+coalesce	mm.c	304;"	f	line:304	file:	signature:(void *bp)
 compensate	fcyc.c	29;"	v	line:29	file:
 counter	clock.c	109;"	v	line:109	file:
 counterRoutine	clock.c	101;"	v	line:101	file:
@@ -105,14 +106,14 @@ eval_libc_valid	mdriver.c	821;"	f	line:821	file:	signature:(trace_t *trace, int 
 eval_mm_speed	mdriver.c	772;"	f	line:772	file:	signature:(void *ptr)
 eval_mm_util	mdriver.c	685;"	f	line:685	file:	signature:(trace_t *trace, int tracenum, range_t **ranges)
 eval_mm_valid	mdriver.c	564;"	f	line:564	file:	signature:(trace_t *trace, int tracenum, range_t **ranges)
-extend_heap	mm.c	279;"	f	line:279	file:	signature:(size_t adusted_size)
+extend_heap	mm.c	283;"	f	line:283	file:	signature:(size_t adusted_size)
 fcyc	fcyc.c	128;"	f	line:128	signature:(test_funct f, void *argp)
-find_end_of_list	mm.c	405;"	f	line:405	file:	signature:(int power_of_two)
-find_fit	mm.c	382;"	f	line:382	file:	signature:(size_t block_size)
+find_end_of_list	mm.c	414;"	f	line:414	file:	signature:(int list_index)
+find_fit	mm.c	391;"	f	line:391	file:	signature:(size_t block_size)
 first_p	ftimer.c	66;"	v	line:66	typeref:struct:itimerval	file:
 first_r	ftimer.c	65;"	v	line:65	typeref:struct:itimerval	file:
 first_u	ftimer.c	64;"	v	line:64	typeref:struct:itimerval	file:
-free_block	mm.c	361;"	f	line:361	file:	signature:(void *bp, size_t adjusted_size)
+free_block	mm.c	370;"	f	line:370	file:	signature:(void *bp, size_t adjusted_size)
 free_lists	mm.c	108;"	v	line:108	file:
 free_trace	mdriver.c	548;"	f	line:548	signature:(trace_t *trace)
 fsecs	fsecs.c	45;"	f	line:45	signature:(fsecs_test_funct f, void *argp)
@@ -126,8 +127,8 @@ get_counter	clock.c	154;"	f	line:154
 get_counter	clock.c	53;"	f	line:53
 get_etime	ftimer.c	91;"	f	line:91	file:	signature:(void)
 has_converged	fcyc.c	93;"	f	line:93	file:
-heap_end	mm.c	124;"	v	line:124	file:
-heap_start	mm.c	123;"	v	line:123	file:
+heap_end	mm.c	126;"	v	line:126	file:
+heap_start	mm.c	125;"	v	line:125	file:
 hi	mdriver.c	43;"	m	line:43	struct:range_t	file:	access:public
 id1	mm.h	17;"	m	line:17	struct:__anon7	access:public
 id2	mm.h	19;"	m	line:19	struct:__anon7	access:public
@@ -138,12 +139,12 @@ init_sampler	fcyc.c	50;"	f	line:50	file:
 kbest	fcyc.c	26;"	v	line:26	file:
 lo	mdriver.c	42;"	m	line:42	struct:range_t	file:	access:public
 main	mdriver.c	140;"	f	line:140	signature:(int argc, char **argv)
-main	mm.c	442;"	f	line:442	signature:(int argc, char* argv[])
+main	mm.c	489;"	f	line:489	signature:(int argc, char* argv[])
 malloc_error	mdriver.c	1016;"	f	line:1016	signature:(int tracenum, int opnum, char *msg)
 maxsamples	fcyc.c	27;"	v	line:27	file:
 mem_brk	memlib.c	19;"	v	line:19	file:
 mem_deinit	memlib.c	40;"	f	line:40	signature:(void)
-mem_header	mm.c	116;"	t	line:116	typeref:struct:__anon6	file:
+mem_header	mm.c	118;"	t	line:118	typeref:struct:__anon6	file:
 mem_heap_hi	memlib.c	82;"	f	line:82
 mem_heap_lo	memlib.c	74;"	f	line:74
 mem_heapsize	memlib.c	90;"	f	line:90
@@ -155,10 +156,10 @@ mem_sbrk	memlib.c	58;"	f	line:58	signature:(int incr)
 mem_start_brk	memlib.c	18;"	v	line:18	file:
 mhz	clock.c	199;"	f	line:199	signature:(int verbose)
 mhz_full	clock.c	185;"	f	line:185	signature:(int verbose, int sleeptime)
-mm_free	mm.c	224;"	f	line:224	signature:(void *ptr)
-mm_init	mm.c	138;"	f	line:138	signature:(void)
-mm_malloc	mm.c	188;"	f	line:188	signature:(size_t size)
-mm_realloc	mm.c	231;"	f	line:231	signature:(void *ptr, size_t size)
+mm_free	mm.c	228;"	f	line:228	signature:(void *ptr)
+mm_init	mm.c	142;"	f	line:142	signature:(void)
+mm_malloc	mm.c	192;"	f	line:192	signature:(size_t size)
+mm_realloc	mm.c	235;"	f	line:235	signature:(void *ptr, size_t size)
 msg	mdriver.c	93;"	v	line:93
 name1	mm.h	16;"	m	line:16	struct:__anon7	access:public
 name2	mm.h	18;"	m	line:18	struct:__anon7	access:public
@@ -175,7 +176,7 @@ range_t	mdriver.c	41;"	s	line:41	file:
 range_t	mdriver.c	45;"	t	line:45	typeref:struct:range_t	file:
 ranges	mdriver.c	72;"	m	line:72	struct:__anon4	file:	access:public
 read_trace	mdriver.c	460;"	f	line:460	file:	signature:(char *tracedir, char *filename)
-remove_from_list	mm.c	422;"	f	line:422	file:	signature:(char *bp, int list_index)
+remove_from_list	mm.c	438;"	f	line:438	file:	signature:(char *bp, int list_index)
 remove_range	mdriver.c	420;"	f	line:420	file:	signature:(range_t **ranges, char *lo)
 samplecount	fcyc.c	37;"	v	line:37	file:
 samples	fcyc.c	44;"	v	line:44	file:

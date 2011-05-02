@@ -87,6 +87,8 @@ to page size. */
 #define GET_ALLOC(p) (GETW(p) & THISALLOC)
 /* Read <previous allocated?> field */
 #define GET_PREVALLOC(p) ((GETW(p) & PREVALLOC))
+/* Read <next allocated?> field */
+#define GET_NEXTALLOC(p) (GET_ALLOC(GET_BLOCKHDR(GET_NEXTBLOCK(p))))
 
 /* Get address of header and footer */
 #define GET_BLOCKHDR(bp) ((char *)(bp) - WSIZE)
@@ -107,13 +109,13 @@ to page size. */
 /* Using size segregated explicit free lists */
 static char * free_lists[FREELIST_COUNT]; /* Segregate by word size power of 2, up to 4096 words */
 
+/* Helper macro to get the mem_header of a payload pointer */
 #define AS_MEM_HEADER(p) ((mem_header *)GET_BLOCKHDR(p))
-typedef struct {
-	unsigned int size_alloc;
-	char *next_free;		/* IMPORTANT!!! The next_free and prev_free fields*/
-	char *prev_free;		/* of this struct point to the START of payload,  */
-							/* not the start of the struct. Remember to always*/
-							/* adjust if you want to set the *_free of one	  */
+/* Struct for making linked list manipulation easier (casting FTW) */
+typedef struct {			/* IMPORTANT!!! The next_free and prev_free fields*/
+	unsigned int size_alloc;/* of this struct point to the START of payload,  */
+	char *next_free;		/* not the start of the struct. Remember to always*/
+	char *prev_free;		/* adjust if you want to set the *_free of one	  */
 							/* mem_header to another mem_header.			  */
 } mem_header;
 
@@ -160,11 +162,11 @@ int mm_init(void)
 	/* Alignment word */
 	PUTW(heap_start, 0);
 
-	/* Prologue Block header */
+	/* Prologue header */
 	PUTW(heap_start + (1 * WSIZE), PACK(DSIZE, 1));
 	PUTW(heap_start + (2 * WSIZE), PACK(DSIZE, 1));
 
-	/* Epilogue Block header */
+	/* Epilogue header */
 	PUTW(heap_end - WSIZE + 1, PACK(0, 1));
 
 
@@ -203,7 +205,11 @@ void *mm_malloc(size_t size)
 
 	/* Search for a best fit */
 	if ((bp = find_fit(adjusted_size)) != NULL) {
+		/* Mark block as allocated, write header info */
 		allocate(bp, adjusted_size);
+
+		/* Remove this block from its respective free list */
+		remove_from_list(bp, calc_min_bits(adjusted_size));
 
 		return bp;
 	}
@@ -254,7 +260,8 @@ void *mm_realloc(void *ptr, size_t size)
 }
 
 
-/**
+/** TODO: Better comment
+ * TODO: Rename this to something more meaningful
  * Calculate bits needed to store a value
  * This is used to determine which free list to look in.
  */
@@ -293,38 +300,50 @@ static void *extend_heap(size_t adusted_size)
 	PUTW(GET_BLOCKHDR(GET_NEXTBLOCK(bp)), PACK(0, THISALLOC)); /* New epilogue header */
 
 	/* Coalesce if the previous block was free */
-	return coalesce(bp);
+	return coalesce(bp); /* coalesce handles adding block to free list */
 }
 
-/**
+/** TODO: Better comment
  * Concatenate adjacent blocks
  *
- * Should upkeep the free list.
+ * Should upkeep the free list. Assumes that bp is always a free block
  */
 static void *coalesce(void *bp)
-{
-	size_t prev_alloc = GET_ALLOC(GET_BLOCKFTR(GET_PREVBLOCK(bp)));
-	size_t next_alloc = GET_ALLOC(GET_BLOCKHDR(GET_NEXTBLOCK(bp)));
-	size_t size = GET_SIZE(GET_BLOCKHDR(GET_NEXTBLOCK(bp)));
+{/* TODO: Cleanup variable declarations */
+	size_t prev_alloc/* = GET_ALLOC(GET_BLOCKFTR(GET_PREVBLOCK(bp)))*/;
+	prev_alloc = GET_PREVALLOC(bp);
+	size_t next_alloc/* = GET_ALLOC(GET_BLOCKHDR(GET_NEXTBLOCK(bp)))*/;
+	next_alloc = GET_NEXTALLOC(bp);
+	size_t size = GET_SIZE(GET_BLOCKHDR(bp));
+	char *next_block = GET_NEXTBLOCK(bp);
+	char *prev_block = GET_PREVBLOCK(bp);
 
-	if (prev_alloc && !next_alloc) {
-		return bp;
+	if (prev_alloc && next_alloc) { /* Both allocated */
+		/*add_to_list(bp, calc_min_bits(GET_SIZE(GET_BLOCKHDR(bp));*/
+		/*return bp;*/ /* Unnecessary. TODO: Delete this */
 	}
 
-	else if (prev_alloc && !next_alloc) {
+	else if (prev_alloc && !next_alloc) { /* next_block is free */
+		remove_from_list(next_block, calc_min_bits(GET_SIZE(next_block)));
+
 		size += GET_SIZE(GET_BLOCKHDR(GET_NEXTBLOCK(bp)));
-		PUTW(GET_BLOCKHDR(bp), PACK(size, 0));
-		PUT(GET_BLOCKFTR(bp), PACK(size, 0));
+		PUTW(GET_BLOCKHDR(bp), PACK(size, prev_alloc));
+		PUTW(GET_BLOCKFTR(bp), PACK(size, prev_alloc));
 	}
 
-	else if (!prev_alloc && next_alloc) {
+	else if (!prev_alloc && next_alloc) { /* prev_block is free */
+		remove_from_list(prev_block, calc_min_bits(GET_SIZE(prev_block)));
+
 		size += GET_SIZE(GET_BLOCKHDR(GET_PREVBLOCK(bp)));
-		PUTW(GET_BLOCKFTR(bp), PACK(size, 0));
-		PUTW(GET_BLOCKHDR(GET_PREVBLOCK(bp)), PACK(size, 0));
+		PUTW(GET_BLOCKFTR(bp), PACK(size, prev_alloc));
+		PUTW(GET_BLOCKHDR(GET_PREVBLOCK(bp)), PACK(size, prev_alloc));
 		bp = GET_PREVBLOCK(bp);
 	}
 
-	else {
+	else { /* Both blocks are free */
+		remove_from_list(next_block, calc_min_bits(GET_SIZE(next_block)));
+		remove_from_list(prev_block, calc_min_bits(GET_SIZE(prev_block)));
+
 		size += GET_SIZE(GET_BLOCKHDR(GET_PREVBLOCK(bp))) +
 		  GET_SIZE(GET_BLOCKFTR(GET_NEXTBLOCK(bp)));
 		PUTW(GET_BLOCKHDR(GET_PREVBLOCK(bp)), PACK(size, 0));
@@ -332,22 +351,24 @@ static void *coalesce(void *bp)
 		bp = GET_PREVBLOCK(bp);
 	}
 
+
+	add_to_list(bp, calc_min_bits(size));
 	return bp;
 }
 
-/**
+/** TODO: Better comment
  * place block (Write header & footer)
  */
 static void allocate(void *bp, size_t adjusted_size)
 {
 	size_t csize = GET_SIZE(GET_BLOCKHDR(bp));
-	unsigned int isPrevAlloc;
+	size_t is_prev_alloc;
 
 	if ((csize - adjusted_size) >= (MIN_SIZE)) {
-		isPrevAlloc = GET_PREVALLOC(bp);
+		is_prev_alloc = GET_PREVALLOC(bp);
 
-		PUTW(GET_BLOCKHDR(bp), PACK(adjusted_size, THISALLOC | isPrevAlloc));
-		PUTW(GET_BLOCKFTR(bp), PACK(adjusted_size, THISALLOC | isPrevAlloc));
+		PUTW(GET_BLOCKHDR(bp), PACK(adjusted_size, THISALLOC | is_prev_alloc));
+		PUTW(GET_BLOCKFTR(bp), PACK(adjusted_size, THISALLOC | is_prev_alloc));
 
 		remove_from_list(bp, calc_min_bits(adjusted_size));
 
@@ -355,37 +376,39 @@ static void allocate(void *bp, size_t adjusted_size)
 		PUTW(GET_BLOCKHDR(bp), PACK(csize - adjusted_size, PREVALLOC));
 		PUTW(GET_BLOCKFTR(bp), PACK(csize - adjusted_size, PREVALLOC));
 
-
+		add_to_list(bp, calc_min_bits(csize - adjusted_size));
 	}
 	else {
-		PUTW(GET_BLOCKHDR(bp), PACK(csize, THISALLOC | isPrevAlloc));
-		PUTW(GET_BLOCKFTR(bp), PACK(csize, THISALLOC | isPrevAlloc));
+		PUTW(GET_BLOCKHDR(bp), PACK(csize, THISALLOC | is_prev_alloc));
+		PUTW(GET_BLOCKFTR(bp), PACK(csize, THISALLOC | is_prev_alloc));
+
+		remove_from_list(bp, calc_min_bits(csize));
 	}
 }
 
 
-/**
+/** TODO: Better comment
  * Mark block at specified address as free and coalesce
  */
 static void free_block(void *bp, size_t adjusted_size)
 {
 	size_t size;
-	unsigned int isPrevAlloc;
+	size_t is_prev_alloc;
 
 	/* Trying to free NULL pointers will only result in chaos */
     if(bp == NULL)
 		return;
 
-	isPrevAlloc = GET_PREVALLOC(GET_BLOCKHDR(bp));
+	is_prev_alloc = GET_PREVALLOC(GET_BLOCKHDR(bp));
 	size = GET_SIZE(GET_BLOCKHDR(bp));
 
-	PUTW(GET_BLOCKHDR(bp), PACK(size, isPrevAlloc));
-	PUTW(GET_BLOCKFTR(bp), PACK(size, isPrevAlloc));
+	PUTW(GET_BLOCKHDR(bp), PACK(size, is_prev_alloc));
+	PUTW(GET_BLOCKFTR(bp), PACK(size, is_prev_alloc));
 
     coalesce(bp);
 }
 
-/**
+/** TODO: Better comment
  * Find a free block of memory of size block_size
  */
 static void * find_fit(size_t block_size)
@@ -408,7 +431,7 @@ static void * find_fit(size_t block_size)
 
 
 
-/**
+/** TODO: Better comment
  *
  */
 static void *find_end_of_list(int list_index)
