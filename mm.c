@@ -43,6 +43,10 @@
 	#define TRACE(...) ;
 #endif
 
+#ifdef MTEST
+	#define test_main main
+#endif
+
 /*********************************************************
  * NOTE TO STUDENTS: Before you do anything else, please
  * provide your team information in the following struct.
@@ -72,17 +76,6 @@ team_t team = {
 /* The size of a size_t type */
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
-/* This sets the type CHUNK to be the minimum block size.
-The name CHUNK was chosen because a BLOCK refers to an allocated block of memory,
-and can be any size, and MINIMUM_BLOCK_SIZE is a bit verbose.
-I realize that CHUNKSIZE in the CS:APP implicit free list implementation refers
-to how much memory to start allocating, but I'll likely be increasing the break aligned
-to page size. */
-#if ALIGNMENT == 8
-#define CHUNK unsigned short
-#else
-#define CHUNK unsigned int
-#endif
 
 #define THISALLOC 0x01
 #define PREVALLOC (0x01 << 1)
@@ -101,14 +94,14 @@ to page size. */
 #define GET_SIZE(p) (GETW(p) & 0xFFFFFFF8)
 /* Read <allocated?> field */
 #define GET_ALLOC(p) (GETW(p) & THISALLOC)
-/* Read <previous allocated?> field */
-#define GET_PREVALLOC(bp) ((GETW(GET_BLOCKHDR(bp)) & PREVALLOC))
-/* Read <next allocated?> field */
-#define GET_NEXTALLOC(bp) (GET_ALLOC(GET_BLOCKHDR(GET_NEXTBLOCK(bp))))
 
 /* Get address of header and footer */
 #define GET_BLOCKHDR(bp) ((char *)(bp) - WSIZE)
 #define GET_BLOCKFTR(bp) ((char *)(bp) + GET_SIZE(GET_BLOCKHDR(bp)) - DSIZE)
+/* Read <previous allocated?> field */
+#define GET_PREVALLOC(bp) ((GETW(GET_BLOCKHDR(bp)) & PREVALLOC))
+/* Read <next allocated?> field */
+#define GET_NEXTALLOC(bp) (GET_ALLOC(GET_BLOCKHDR(GET_NEXTBLOCK(bp))))
 
 /*  */
 #define GET_NEXTBLOCK(bp) ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))
@@ -175,7 +168,7 @@ int mm_init(void)
 
 	/* TODO: Determine if I actually need this variable */
 	heap_end = mem_heap_hi();
-	PUTW(heap_end-3, 0xCAFEBABE);
+	PUTW(heap_end-3, 0xC0DEDBAD);
 
 	/* Alignment word */
 	PUTW(heap_start, 0x8BADF00D);
@@ -325,6 +318,8 @@ static void *extend_heap(size_t adjusted_size)
 	if ((long)(bp = mem_sbrk(adjusted_size)) == -1)
 		return NULL;
 
+	/*memset((unsigned int *)bp, 0xDEADBEEF, adjusted_size/WSIZE);*/
+
 	/* Initialize free block header/footer and the epilogue header */
 	prev_alloc = GET_PREVALLOC(bp);
 
@@ -335,7 +330,7 @@ static void *extend_heap(size_t adjusted_size)
 	PUTW(GET_BLOCKFTR(bp), PACK(adjusted_size, prev_alloc));
 
 	/* New epilogue header */
-	PUTW(GET_BLOCKHDR(GET_NEXTBLOCK(bp)), PACK(0xDEADBEEF, THISALLOC));
+	PUTW(GET_BLOCKHDR(GET_NEXTBLOCK(bp)), PACK(0xC0DEDBAD, THISALLOC));
 	heap_end = GET_BLOCKHDR(GET_NEXTBLOCK(bp));
 	/* Coalesce if the previous block was free */
 	return coalesce(bp); /* coalesce handles adding block to free list */
@@ -560,10 +555,25 @@ static void add_to_list(char *bp, int list_index)
 }
 
 
-/*
-int main(int argc, char* argv[])
+
+int test_main(int argc, char* argv[])
 {
+	char *arr[] = {NULL, NULL, NULL, NULL, NULL};
+	mm_init();
+
+	arr[0] = mm_malloc(2040);
+	memset(arr[0], 0xF0, 2040);
+
+	arr[0] = mm_malloc(2040);
+	memset(arr[0], 0xF1, 2040);
+
+	arr[0] = mm_malloc(48);
+	memset(arr[0], 0xF2, 48);
+
+	arr[0] = mm_malloc(4072);
+	memset(arr[0], 0xF3, 4072);
+
 	return 0;
 }
-*/
+
 
