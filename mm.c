@@ -35,16 +35,19 @@
 #include "mm.h"
 #include "memlib.h"
 
+#ifdef MTEST
+	#define _DEBUG
+	#define test_main main
+#endif
+
 #define _DEBUG
 
 #ifdef _DEBUG
 	#define TRACE(...) printf(__VA_ARGS__); fflush(stdout)
+
+	char* get_heap_str(char *addr, size_t len, size_t bytes_per_block, size_t blocks_per_row);
 #else
 	#define TRACE(...) ;
-#endif
-
-#ifdef MTEST
-	#define test_main main
 #endif
 
 /*********************************************************
@@ -216,7 +219,7 @@ void *mm_malloc(size_t size)
 	if (size == 0)
 		return NULL;
 
-	TRACE(">>>Running mm_malloc. size = %d\n", size);
+	TRACE(">>>Entering mm_malloc(size=%lu)", size);
 	if (size == 4072) {
 		TRACE("OH NO!\n");
 	}
@@ -252,7 +255,7 @@ void *mm_malloc(size_t size)
  */
 void mm_free(void *ptr)
 {
-	TRACE(">>>Entering mm_free()\n");
+	TRACE(">>>Entering mm_free(ptr=0x%X)\n", (unsigned int)ptr);
 }
 
 /**
@@ -260,7 +263,7 @@ void mm_free(void *ptr)
  */
 void *mm_realloc(void *ptr, size_t size)
 {
-	TRACE(">>>Entering mm_realloc()\n");
+	TRACE(">>>Entering mm_realloc(ptr=0x%X, size=%lu)\n", (unsigned int)ptr, size);
 /*
 	void *oldptr = ptr;
 	void *newptr;
@@ -313,7 +316,7 @@ static void *extend_heap(size_t adjusted_size)
 	char *bp;
 	size_t prev_alloc;
 
-	TRACE("Entering extend_heap()\n");
+	TRACE("Entering extend_heap(adjusted_size=%lu)\n", adjusted_size);
 
 	if ((long)(bp = mem_sbrk(adjusted_size)) == -1)
 		return NULL;
@@ -351,7 +354,7 @@ static void *coalesce(void *bp)
 	char *next_block = GET_NEXTBLOCK(bp);
 	char *prev_block = GET_PREVBLOCK(bp);
 
-	TRACE(">>>Entering coalesce()\n");
+	TRACE(">>>Entering coalesce(bp=0x%X)\n", (unsigned int)bp);
 
 	/* Case 1, Both blocks allocated, does not need its own if statement */
 
@@ -395,7 +398,7 @@ static void allocate(void *bp, size_t adjusted_size)
 	size_t csize = GET_SIZE(GET_BLOCKHDR(bp));
 	size_t is_prev_alloc;
 
-	TRACE(">>>Entering allocate()\n");
+	TRACE(">>>Entering allocate(bp=0x%X, adjusted_size=%lu)\n", (unsigned int)bp, adjusted_size);
 
 	if ((csize - adjusted_size) >= (MIN_SIZE)) {
 		is_prev_alloc = GET_PREVALLOC(bp);
@@ -428,7 +431,7 @@ static void free_block(void *bp, size_t adjusted_size)
 	size_t size;
 	size_t is_prev_alloc;
 
-	TRACE(">>>Entering free_block()\n");
+	TRACE(">>>Entering free_block(bp=0x%X, adjusted_size=%lu)\n", (unsigned int)bp, adjusted_size);
 
 	/* Trying to free NULL pointers will only result in chaos */
     if(bp == NULL)
@@ -450,13 +453,14 @@ static void * find_fit(size_t block_size, int *result_index)
 		/* Make sure we search according to size & alignment requirements */
 		min_index = /*ADJUST_WORDCOUNT(*/calc_min_bits(block_size)/*)*/;
 
-	TRACE(">>>Entering find_fit()\n");
+	TRACE(">>>Entering find_fit(block_size=%lu, [retval result_index])\n", block_size);
 
 	/* Look at the free list with the minimum size needed to hold block_size */
 	for (list_index = min_index; list_index < FREELIST_COUNT; list_index++) {
 		/* If the head of the list is not null, we can use it */
 		if (free_lists[list_index] != NULL) {
 			*result_index = list_index;
+			TRACE(">>>>>>result_index=%d", *result_index);
 			return (void *)free_lists[list_index];
 		}
 		/* Otherwise, we can't */
@@ -474,7 +478,7 @@ static void *find_end_of_list(int list_index)
 	size_t *bp = (size_t *)free_lists[list_index];
 	size_t *next_bp = bp;
 
-	TRACE(">>>Entering find_end_of_list()\n");
+	TRACE(">>>Entering find_end_of_list(bp=0x%X, list_index=%d)\n", (unsigned int)bp, list_index);
 
 	while (next_bp != NULL) {
 		bp = next_bp;
@@ -501,7 +505,7 @@ static void remove_from_list(char *bp, int list_index) /* TODO: Might not need l
 	mem_header *next_header;
 	mem_header *prev_header;
 
-	TRACE(">>>Entering remove_from_list()\n");
+	TRACE(">>>Entering remove_from_list(bp=0x%X, list_index=%d)\n", (unsigned int)bp, list_index);
 
 	if (header->next_free != NULL) {
 		next_header = AS_MEM_HEADER(header->next_free);
@@ -536,7 +540,7 @@ static void add_to_list(char *bp, int list_index)
 	mem_header *header = AS_MEM_HEADER(bp);
 	mem_header *last_node;
 
-	TRACE(">>>Entering add_to_list()\n");
+	TRACE(">>>Entering add_to_list(bp=0x%X, list_index=%d)\n", (unsigned int)bp, list_index);
 
 	prev = find_end_of_list(list_index);
 
@@ -562,18 +566,113 @@ int test_main(int argc, char* argv[])
 	mm_init();
 
 	arr[0] = mm_malloc(2040);
-	memset(arr[0], 0xF0, 2040);
+	memset(arr[0], 0xFE, 2040);
 
 	arr[0] = mm_malloc(2040);
-	memset(arr[0], 0xF1, 2040);
+	memset(arr[1], 0xF1, 2040);
 
 	arr[0] = mm_malloc(48);
-	memset(arr[0], 0xF2, 48);
+	memset(arr[2], 0xF2, 48);
 
 	arr[0] = mm_malloc(4072);
-	memset(arr[0], 0xF3, 4072);
+	memset(arr[3], 0xF3, 4072);
 
 	return 0;
 }
 
 
+
+
+#ifdef _DEBUG
+
+/**
+ * print_heap
+ *
+ *
+ * Parameters:
+ *
+ * addr - The address at which to start examining memory
+ *
+ * len  - The amount of memory to examine
+ *
+ * byte_per_block - The number of bytes in a block (formatting)
+ *
+ * blocks_per_row - How many blocks to show on each line
+ *
+ *
+ * Returns a dynamically allocated string that you can print to show the heap.
+ */
+char* get_heap_str(char *addr, size_t len, size_t bytes_per_block, size_t blocks_per_row)
+{
+	char **rows;
+	char *rowbuffer, *output;
+	char *bytes = malloc(len);
+	unsigned int bptr, rowptr, byte_blockprogress, block_progress;
+	size_t rowlen, blockcount, rowcount, totalsize = 0;
+
+	if (len == 0 || bytes_per_block == 0 || blocks_per_row == 0)
+		return NULL;
+
+	blockcount = len / bytes_per_block + (len % bytes_per_block ? 1 : 0);
+	rowcount = blockcount / blocks_per_row + (blockcount % blocks_per_row ? 1 : 0);
+
+	rowlen = ((bytes_per_block + 1) * 2 + 3) * blocks_per_row  + 3 + (8);
+	rowbuffer = malloc(rowlen);
+
+	memset(rowbuffer, 0, rowlen);
+	rows = calloc(sizeof(char *), rowcount);
+	memset(rows, 0, sizeof(char*)*rowcount);
+
+	for (bptr = 0; bptr < len; bptr++) {
+		bytes[bptr] = *((char *)(bptr + addr));
+	}
+
+	bptr = 0;
+	rowptr = 0;
+	byte_blockprogress = 0;
+	block_progress = 0;
+	while (bptr < len) {
+
+		if (block_progress == 0) {
+			rowbuffer = malloc(rowlen);
+			sprintf(rowbuffer, "0x%X:  ", (unsigned int)(addr + bptr));
+		}
+
+		if (byte_blockprogress == 0) {
+			strcat(rowbuffer, "  0x");
+			block_progress++;
+		}
+
+		sprintf(rowbuffer + strlen(rowbuffer), "%X", (unsigned char)(*(addr + bptr)));
+		byte_blockprogress++;
+
+		bptr++;
+
+		if (byte_blockprogress >= bytes_per_block) {
+			byte_blockprogress = 0;
+			block_progress++;
+		}
+
+		if (block_progress >= blocks_per_row) {
+			block_progress = 0;
+			strcat(rowbuffer, "\n");
+			rows[rowptr] = rowbuffer;
+			rowptr++;
+			totalsize += strlen(rowbuffer);
+		}
+
+	}
+
+	output = malloc(totalsize+1);
+	memset(output, 0, totalsize+1);
+	for (rowptr = 0; rowptr < rowcount; rowptr++) {
+		strcat(output, rows[rowptr]);
+		free(rows[rowptr]);
+	}
+	free(rows);
+	free(bytes);
+
+	return output;
+}
+
+#endif
