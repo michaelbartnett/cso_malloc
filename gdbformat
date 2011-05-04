@@ -1,0 +1,67 @@
+#!/usr/bin/env python
+
+import sys
+import os
+
+argc = len(sys.argv)
+
+def usage():
+	print
+	print "Usage: gdbformat [filename]"
+	print
+	print "Takes input in the form of output given by the gdb command 'x/wx'"
+	print "and formats it such that there is one word per row, allowing you"
+	print "to see the addresses of individual words in memory."
+	print
+	print "The output is written to stdout, so you can use pipes and"
+	print "redirections with gdbformat. Common use is to tell gdb to"
+	print "log to a specific file, turn on logging, run a command,"
+	print "turn off logging, and then run gdbformat with your log file"
+	print "as the [filename] argument, optionally redirecting to a"
+	print "second file."
+	print
+	print "filename - should be an existing file"
+	print "           If no filename is provided, gdbformat read from stdin."
+	print "           Enter EOF (Ctrl+D) to end your input."
+	print
+
+
+
+def read_input(input, output):
+	for line in input:
+		words = line.split()
+		for s in [words[0], '    ', words[1], os.linesep]:
+			output.append(s)
+
+		address = int(words[0][:-1], 0)
+
+		for block in words[2:]:
+			address += 4
+			for s in [hex(address), ':    ', block, os.linesep]:
+				output.append(s)
+
+
+
+def main():
+	if argc < 2:
+		input = sys.stdin
+	elif sys.argv[1] == '-h' or sys.argv[1] == '--help':
+		usage();
+		sys.exit(0)
+	else:
+		if not os.path.isfile(sys.argv[1]):
+			print "Error: filename '%s' not found." % (sys.argv[1])
+			usage()
+			sys.exit(1)
+
+		input = open(sys.argv[1], 'r')
+
+	output = []
+
+	read_input(input, output)
+
+	print ''.join(output)
+# 	print str(output)
+
+if __name__ == '__main__':
+	main()

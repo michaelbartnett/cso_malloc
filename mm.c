@@ -43,9 +43,11 @@
 #define _DEBUG
 
 #ifdef _DEBUG
+	#include "config.h" /* Need access to MAX_HEAP for debugging purposes */
 	#define TRACE(...) printf(__VA_ARGS__); fflush(stdout)
 
 	char* get_heap_str(char *addr, size_t len, size_t bytes_per_block, size_t blocks_per_row);
+	void mm_check();
 #else
 	#define TRACE(...) ;
 #endif
@@ -159,6 +161,12 @@ int mm_init(void)
 	TRACE(">>>Entering mm_init()\n");
 	mem_init();
 
+	#ifdef _DEBUG
+		/* initialize the ENTIRE heap provided by memlib to 0x00 */
+		memset(mem_heap_lo(), 0, MAX_HEAP);
+	#endif
+
+
 	memset(free_lists, (int)NULL, sizeof(free_lists));
 
 	/* Initialize write-once variables */
@@ -172,7 +180,6 @@ int mm_init(void)
 
 	/* TODO: Determine if I actually need this variable */
 	heap_end = mem_heap_hi();
-	PUTW(heap_end-3, 0xC0DEDBAD);
 
 	/* Alignment word */
 	PUTW(heap_start, 0x8BADF00D);
@@ -182,7 +189,7 @@ int mm_init(void)
 	PUTW(heap_start + (2 * WSIZE), PACK(DSIZE, THISALLOC | PREVALLOC));
 
 	/* Epilogue header */
-	PUTW(heap_end - WSIZE + 1, PACK(0, THISALLOC));
+	PUTW(heap_start + ADJUSTED_PAGESIZE, PACK(0xB00B1E50, THISALLOC));
 
 	/* Setup initial free block */
 	PUTW(heap_start + (3 * WSIZE), PACK(ADJUSTED_PAGESIZE, PREVALLOC));
@@ -199,7 +206,7 @@ int mm_init(void)
 	header->prev_free = NULL;
 	header->next_free = NULL;
 */
-
+	mm_check();
 	TRACE("<<<---Leaving mm_init()\n");
 	return 0;
 }
@@ -239,13 +246,15 @@ void *mm_malloc(size_t size)
 	}
 
 	/* No fit found, extend the heap */
-	if ((bp = extend_heap(MAX(adjusted_size, ADJUSTED_PAGESIZE))) == NULL)
+	if ((bp = extend_heap(MAX(adjusted_size, ADJUSTED_PAGESIZE))) == NULL) {
 		TRACE("<<<---Leaving mm_malloc(), returning NULL because extend_heap failed\n");
 		return NULL;
+	}
 
 	bp += WSIZE; /* Move bp up to payload address */
 	allocate(bp, adjusted_size);
 
+	mm_check();
 	TRACE("<<<---Leaving mm_malloc() returning 0x%X\n", bp);
 	return bp;
 }
@@ -327,6 +336,8 @@ static void *extend_heap(size_t adjusted_size)
 	if ((long)(bp = mem_sbrk(adjusted_size)) == -1)
 		return NULL;
 
+/*	bp = ALIGN(bp); /* Maybe this will work! */
+
 	/*memset((unsigned int *)bp, 0xDEADBEEF, adjusted_size/WSIZE);*/
 
 	/* Initialize free block header/footer and the epilogue header */
@@ -339,8 +350,8 @@ static void *extend_heap(size_t adjusted_size)
 	PUTW(GET_BLOCKFTR(bp), PACK(adjusted_size, prev_alloc));
 
 	/* New epilogue header */
-	PUTW(GET_BLOCKHDR(GET_NEXTBLOCK(bp)), PACK(0xC0DEDBAD, THISALLOC));
-	heap_end = GET_BLOCKHDR(GET_NEXTBLOCK(bp));
+	PUTW(GET_BLOCKHDR(GET_NEXTBLOCK(bp)), PACK(0xB00B1E50, THISALLOC));
+	heap_end = mem_heap_hi();
 
 	TRACE("<<<---Leaving extend_heap() with a call to coalesce()\n");
 	/* Coalesce if the previous block was free */
@@ -524,6 +535,9 @@ static void remove_from_list(char *bp, int list_index)
 	mem_header *prev_header;
 
 	TRACE(">>>Entering remove_from_list(bp=0x%X, list_index=%d)\n", (unsigned int)bp, list_index);
+	TRACE("        Removing data block of size %u\n", header->size_alloc);
+	TRACE("        header->next_free = %0x%X\n", header->next_free);
+	TRACE("        header->prev_free = %0x%X\n", header->prev_free);
 
 	if (header->next_free != NULL) {
 		next_header = AS_MEM_HEADER(header->next_free);
@@ -580,6 +594,26 @@ static void add_to_list(char *bp, int list_index)
 	TRACE("<<<---Leaving add_to_list()\n");
 }
 
+#ifdef _DEBUG
+/**
+ *
+ */
+void mm_check()
+{
+	/* First check to ensure that we have no data past MAX_HEAP */
+	assert(heap_end < heap_start + MAX_HEAP);
+
+	/* Next make sure heap_end is set appropriately */
+	assert(heap_end == mem_heap_hi());
+
+	/* Then make sure we haven't written past mem_heap_hi() */
+	char *bp = heap_end + 1;
+	while (bp < heap_start + MAX_HEAP) {
+		assert((*bp) == 0);
+		bp++;
+	}
+}
+#endif
 
 
 
@@ -629,6 +663,8 @@ void debuggable_memset(void* addr, unsigned char value, size_t len)
 
 	TRACE("------ YOU ARE NOW IN DEBUGGABLE_MEMSET. LOVE IT, FEAR IT, HATE IT. ------\n");
 
+	/* I don't know if standard memset does any safety checks, but this one
+		sure as hell doesn't */
 	while (byte_pointer < len) {
 		*byte_pointer = value;
 		byte_pointer++;
@@ -642,9 +678,11 @@ void debuggable_memset(void* addr, unsigned char value, size_t len)
  *                           test_main                               *
  *     Function for testing mm_malloc in a controlled environment    *
  *********************************************************************/
+static  char *arr[] = {NULL, NULL, NULL, NULL, NULL};
+
+
 int test_main(int argc, char* argv[])
 {
-	char *arr[] = {NULL, NULL, NULL, NULL, NULL};
 	mm_init();
 
 	arr[0] = mm_malloc(2040);
