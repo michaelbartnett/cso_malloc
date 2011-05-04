@@ -156,6 +156,7 @@ static void free_block(void *bp, size_t adjusted_size);
  */
 int mm_init(void)
 {
+	TRACE(">>>Entering mm_init()\n");
 	mem_init();
 
 	memset(free_lists, (int)NULL, sizeof(free_lists));
@@ -199,7 +200,7 @@ int mm_init(void)
 	header->next_free = NULL;
 */
 
-
+	TRACE("<<<---Leaving mm_init()\n");
 	return 0;
 }
 
@@ -214,12 +215,14 @@ void *mm_malloc(size_t size)
 	size_t adjusted_size; /* Adjusted (aligned) block size */
 	char *bp;
 	int list_index;
+	TRACE(">>>Entering mm_malloc(size=%u)\n", size);
 
 	/* Ignore stupid/ugly programmers */
-	if (size == 0)
+	if (size == 0) {
+		TRACE("<<<---Leaving mm_malloc() because some stupid/ugly programmed asked for size 0\n");
 		return NULL;
+	}
 
-	TRACE(">>>Entering mm_malloc(size=%u)", size);
 	if (size == 4072) {
 		TRACE("OH NO!\n");
 	}
@@ -245,6 +248,7 @@ void *mm_malloc(size_t size)
 	bp += WSIZE; /* Move bp up to payload address */
 	allocate(bp, adjusted_size);
 
+	TRACE("<<<---Leaving mm_malloc() returning 0x%X\n", bp);
 	return bp;
 }
 
@@ -256,6 +260,7 @@ void *mm_malloc(size_t size)
 void mm_free(void *ptr)
 {
 	TRACE(">>>Entering mm_free(ptr=0x%X)\n", (unsigned int)ptr);
+	TRACE("<<<---Leaving mm_free()\n");
 }
 
 /**
@@ -280,6 +285,7 @@ void *mm_realloc(void *ptr, size_t size)
 	return newptr;
 
 */
+	TRACE("<<<---Leaving mm_realloc()\n");
 	return NULL;
 }
 
@@ -292,9 +298,11 @@ void *mm_realloc(void *ptr, size_t size)
 static int calc_min_bits(size_t size)
 {
 	int bits = 0;
+	TRACE(">>>Entering calc_min_bits(size=%u)\n", size);
 	while (size >> bits > 1) {
 		bits++;
 	}
+	TRACE("<<<---Leaving calc_min_bits(), returning %d\n", bits);
 	return bits;
 }
 
@@ -335,6 +343,8 @@ static void *extend_heap(size_t adjusted_size)
 	/* New epilogue header */
 	PUTW(GET_BLOCKHDR(GET_NEXTBLOCK(bp)), PACK(0xC0DEDBAD, THISALLOC));
 	heap_end = GET_BLOCKHDR(GET_NEXTBLOCK(bp));
+
+	TRACE("<<<---Leaving extend_heap() with a call to coalesce()\n");
 	/* Coalesce if the previous block was free */
 	return coalesce(bp); /* coalesce handles adding block to free list */
 }
@@ -387,6 +397,7 @@ static void *coalesce(void *bp)
 	}
 
 	add_to_list(bp, calc_min_bits(size));
+	TRACE("<<<---Leaving coalesce()\n");
 	return bp;
 }
 
@@ -397,6 +408,7 @@ static void allocate(void *bp, size_t adjusted_size)
 {
 	size_t csize = GET_SIZE(GET_BLOCKHDR(bp));
 	size_t is_prev_alloc;
+	/*int available_index;*/
 
 	TRACE(">>>Entering allocate(bp=0x%X, adjusted_size=%u)\n", (unsigned int)bp, adjusted_size);
 
@@ -406,6 +418,7 @@ static void allocate(void *bp, size_t adjusted_size)
 		PUTW(GET_BLOCKHDR(bp), PACK(adjusted_size, THISALLOC | is_prev_alloc));
 		PUTW(GET_BLOCKFTR(bp), PACK(adjusted_size, THISALLOC | is_prev_alloc));
 
+		/*find_fit(adjusted_size, &available_index);*/
 		remove_from_list(bp, calc_min_bits(adjusted_size));
 
 		bp = GET_NEXTBLOCK(bp);
@@ -420,6 +433,7 @@ static void allocate(void *bp, size_t adjusted_size)
 
 		remove_from_list(bp, calc_min_bits(csize));
 	}
+	TRACE("<<<---Leaving allocate()\n");
 }
 
 
@@ -442,6 +456,8 @@ static void free_block(void *bp, size_t adjusted_size)
 
 	PUTW(GET_BLOCKHDR(bp), PACK(size, is_prev_alloc));
 	PUTW(GET_BLOCKFTR(bp), PACK(size, is_prev_alloc));
+
+	TRACE("<<<---Leaving free_block()\n");
 }
 
 /** TODO: Better comment
@@ -460,11 +476,12 @@ static void * find_fit(size_t block_size, int *result_index)
 		/* If the head of the list is not null, we can use it */
 		if (free_lists[list_index] != NULL) {
 			*result_index = list_index;
-			TRACE(">>>>>>result_index=%d", *result_index);
+			TRACE("<<<---Leaving find_fit, result_index=%d\n", *result_index);
 			return (void *)free_lists[list_index];
 		}
 		/* Otherwise, we can't */
 	}
+	TRACE("<<<---Leaving find_fit()\n");
 	return NULL;
 }
 
@@ -478,12 +495,13 @@ static void *find_end_of_list(int list_index)
 	size_t *bp = (size_t *)free_lists[list_index];
 	size_t *next_bp = bp;
 
-	TRACE(">>>Entering find_end_of_list(bp=0x%X, list_index=%d)\n", (unsigned int)bp, list_index);
+	TRACE(">>>Entering find_end_of_list(list_index=%d)\n", list_index);
 
 	while (next_bp != NULL) {
 		bp = next_bp;
-		next_bp = (size_t *)(*((size_t *)bp)); /* TODO: Make sure this is the right syntax */
+		next_bp = (size_t *)(*((size_t *)bp));
 	}
+	TRACE("<<<---Leaving find_end_of_list() returning 0x%X\n", bp);
 	return bp;
 }
 
@@ -499,7 +517,7 @@ static void *find_end_of_list(int list_index)
  * 	  bp - Pointer to the payload
  * 	  list_index - The free list index (power of two representing word size)
  */
-static void remove_from_list(char *bp, int list_index) /* TODO: Might not need list_index param */
+static void remove_from_list(char *bp, int list_index)
 {
 	mem_header *header = AS_MEM_HEADER(bp);
 	mem_header *next_header;
@@ -520,6 +538,7 @@ static void remove_from_list(char *bp, int list_index) /* TODO: Might not need l
 	if (free_lists[list_index] == bp) {
 		free_lists[list_index] = header->next_free;
 	}
+	TRACE("<<<---Leaving remove_from_list()\n");
 }
 
 
@@ -556,6 +575,8 @@ static void add_to_list(char *bp, int list_index)
 	last_node->next_free = bp;
 	header->prev_free = prev;
 	header->next_free = NULL;
+
+	TRACE("<<<---Leaving add_to_list()\n");
 }
 
 
