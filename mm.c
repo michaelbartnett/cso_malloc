@@ -219,7 +219,7 @@ void *mm_malloc(size_t size)
 	if (size == 0)
 		return NULL;
 
-	TRACE(">>>Entering mm_malloc(size=%lu)", size);
+	TRACE(">>>Entering mm_malloc(size=%u)", size);
 	if (size == 4072) {
 		TRACE("OH NO!\n");
 	}
@@ -263,7 +263,7 @@ void mm_free(void *ptr)
  */
 void *mm_realloc(void *ptr, size_t size)
 {
-	TRACE(">>>Entering mm_realloc(ptr=0x%X, size=%lu)\n", (unsigned int)ptr, size);
+	TRACE(">>>Entering mm_realloc(ptr=0x%X, size=%u)\n", (unsigned int)ptr, size);
 /*
 	void *oldptr = ptr;
 	void *newptr;
@@ -316,7 +316,7 @@ static void *extend_heap(size_t adjusted_size)
 	char *bp;
 	size_t prev_alloc;
 
-	TRACE("Entering extend_heap(adjusted_size=%lu)\n", adjusted_size);
+	TRACE("Entering extend_heap(adjusted_size=%u)\n", adjusted_size);
 
 	if ((long)(bp = mem_sbrk(adjusted_size)) == -1)
 		return NULL;
@@ -398,7 +398,7 @@ static void allocate(void *bp, size_t adjusted_size)
 	size_t csize = GET_SIZE(GET_BLOCKHDR(bp));
 	size_t is_prev_alloc;
 
-	TRACE(">>>Entering allocate(bp=0x%X, adjusted_size=%lu)\n", (unsigned int)bp, adjusted_size);
+	TRACE(">>>Entering allocate(bp=0x%X, adjusted_size=%u)\n", (unsigned int)bp, adjusted_size);
 
 	if ((csize - adjusted_size) >= (MIN_SIZE)) {
 		is_prev_alloc = GET_PREVALLOC(bp);
@@ -431,7 +431,7 @@ static void free_block(void *bp, size_t adjusted_size)
 	size_t size;
 	size_t is_prev_alloc;
 
-	TRACE(">>>Entering free_block(bp=0x%X, adjusted_size=%lu)\n", (unsigned int)bp, adjusted_size);
+	TRACE(">>>Entering free_block(bp=0x%X, adjusted_size=%u)\n", (unsigned int)bp, adjusted_size);
 
 	/* Trying to free NULL pointers will only result in chaos */
     if(bp == NULL)
@@ -453,7 +453,7 @@ static void * find_fit(size_t block_size, int *result_index)
 		/* Make sure we search according to size & alignment requirements */
 		min_index = /*ADJUST_WORDCOUNT(*/calc_min_bits(block_size)/*)*/;
 
-	TRACE(">>>Entering find_fit(block_size=%lu, [retval result_index])\n", block_size);
+	TRACE(">>>Entering find_fit(block_size=%u, [retval result_index])\n", block_size);
 
 	/* Look at the free list with the minimum size needed to hold block_size */
 	for (list_index = min_index; list_index < FREELIST_COUNT; list_index++) {
