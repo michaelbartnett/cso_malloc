@@ -223,10 +223,6 @@ void *mm_malloc(size_t size)
 		return NULL;
 	}
 
-	if (size == 4072) {
-		TRACE("OH NO!\n");
-	}
-
 	/* Adjust block size to allow for header and match alignment */
 	adjusted_size = ADJUST_BYTESIZE(size);
 
@@ -238,11 +234,13 @@ void *mm_malloc(size_t size)
 		/* Remove this block from its respective free list */
 		remove_from_list(bp, list_index);
 
+		TRACE("<<<---Leaving mm_malloc(), returning 0x%X\n", bp);
 		return bp;
 	}
 
 	/* No fit found, extend the heap */
 	if ((bp = extend_heap(MAX(adjusted_size, ADJUSTED_PAGESIZE))) == NULL)
+		TRACE("<<<---Leaving mm_malloc(), returning NULL because extend_heap failed\n");
 		return NULL;
 
 	bp += WSIZE; /* Move bp up to payload address */
@@ -419,6 +417,8 @@ static void allocate(void *bp, size_t adjusted_size)
 		PUTW(GET_BLOCKFTR(bp), PACK(adjusted_size, THISALLOC | is_prev_alloc));
 
 		/*find_fit(adjusted_size, &available_index);*/
+		/* Marking this memory as NOT in teh free list, bp should be a
+			valid pointer to a node in a free list*/
 		remove_from_list(bp, calc_min_bits(adjusted_size));
 
 		bp = GET_NEXTBLOCK(bp);
@@ -567,6 +567,7 @@ static void add_to_list(char *bp, int list_index)
 		free_lists[list_index] = bp;
 		header->next_free = NULL;
 		header->prev_free = NULL;
+		TRACE("<<<---Leaving add_to_list(), list's head pointer NULL, list empty\n");
 		return;
 	}
 
@@ -581,21 +582,85 @@ static void add_to_list(char *bp, int list_index)
 
 
 
+
+
+
+
+
+/************************  Welcome to testing land!  **************************/
+/*																			  */
+/*                          oooo$$$$$$$$$$$$oooo							  */
+/*                      oo$$$$$$$$$$$$$$$$$$$$$$$$o							  */
+/*                  oo$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$o         o$   $$ o$	  */
+/*   o $ oo        o$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$o       $$ $$ $$o$	  */
+/*oo $ $ "$      o$$$$$$$$$    $$$$$$$$$$$$$    $$$$$$$$$o       $$$o$$o$	  */
+/*"$$$$$$o$     o$$$$$$$$$      $$$$$$$$$$$      $$$$$$$$$$o    $$$$$$$$	  */
+/*  $$$$$$$    $$$$$$$$$$$      $$$$$$$$$$$      $$$$$$$$$$$$$$$$$$$$$$$	  */
+/*  $$$$$$$$$$$$$$$$$$$$$$$    $$$$$$$$$$$$$    $$$$$$$$$$$$$$  """$$$		  */
+/*   "$$$""""$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$     "$$$		  */
+/*    $$$   o$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$     "$$$o	  */
+/*   o$$"   $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$       $$$o	  */
+/*   $$$    $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$" "$$$$$$ooooo$$$$o  */
+/*  o$$$oooo$$$$$  $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$   o$$$$$$$$$$$$$$$$$ */
+/*  $$$$$$$$"$$$$   $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$     $$$$""""""""		  */
+/* """"       $$$$    "$$$$$$$$$$$$$$$$$$$$$$$$$$$$"      o$$$				  */
+/*            "$$$o     """$$$$$$$$$$$$$$$$$$"$$"         $$$				  */
+/*              $$$o          "$$""$$$$$$""""           o$$$				  */
+/*               $$$$o                                o$$$"					  */
+/*                "$$$$o      o$$$$$$o"$$$$o        o$$$$					  */
+/*                  "$$$$$oo     ""$$$$o$$$$$o   o$$$$""					  */
+/*                     ""$$$$$oooo  "$$$o$$$$$$$$$"""						  */
+/*                        ""$$$$$$$oo $$$$$$$$$$							  */
+/*                                """"$$$$$$$$$$$							  */
+/*                                    $$$$$$$$$$$$							  */
+/*                                     $$$$$$$$$$"							  */
+/*                                      "$$$""  							  */
+/*																			  */
+/***************************  It's a silly place  *****************************/
+
+/**
+ * debuggable_memset
+ *
+ * Our own memset(), existing solely so we can watch each byte get set
+ */
+void debuggable_memset(void* addr, unsigned char value, size_t len)
+{
+	unsigned char *byte_pointer = addr;
+
+	TRACE("------ YOU ARE NOW IN DEBUGGABLE_MEMSET. LOVE IT, FEAR IT, HATE IT. ------\n");
+
+	while (byte_pointer < len) {
+		*byte_pointer = value;
+		byte_pointer++;
+	}
+	TRACE("...... ok, dun memsetting ......\n");
+}
+
+
+
+/*********************************************************************
+ *                           test_main                               *
+ *     Function for testing mm_malloc in a controlled environment    *
+ *********************************************************************/
 int test_main(int argc, char* argv[])
 {
 	char *arr[] = {NULL, NULL, NULL, NULL, NULL};
 	mm_init();
 
 	arr[0] = mm_malloc(2040);
+	TRACE("Got pointer to memory from malloc, 0x%X.\n Memsetting to 0xFE\n", arr[0]);
 	memset(arr[0], 0xFE, 2040);
 
 	arr[0] = mm_malloc(2040);
-	memset(arr[1], 0xF1, 2040);
+	TRACE("Got pointer to memory from malloc, 0x%X.\n. Memsetting to 0xF1\n", arr[1]);
+	debuggable_memset(arr[1], 0xF1, 2040);
 
 	arr[0] = mm_malloc(48);
+	TRACE("Got pointer to memory from malloc, 0x%X.\n Memsetting to 0xF2\n", arr[2]);
 	memset(arr[2], 0xF2, 48);
 
 	arr[0] = mm_malloc(4072);
+	TRACE("Got pointer to memory from malloc, 0x%X.\n Memsetting to 0xF3\n", arr[3]);
 	memset(arr[3], 0xF3, 4072);
 
 	return 0;
