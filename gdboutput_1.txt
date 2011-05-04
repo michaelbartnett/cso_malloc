@@ -1042,4 +1042,3 @@ memset(arr[1], 0xF1, 2040);
 0x1001014:    0x00000000 -> should be 0xb00b1e51
 0x1001018:    0x00000000 -> This is beyond mem_heap_hi()
 0x100101c:    0x00000000
-
