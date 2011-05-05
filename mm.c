@@ -394,7 +394,9 @@ static void *coalesce(void *bp)
 	if (prev_alloc && !next_alloc) { /* next_block is free */
 		remove_from_list(next_block, calc_min_bits(GET_THISSIZE(next_block)));
 
-		size += GET_SIZE(GET_BLOCKHDR(GET_NEXTBLOCK(bp)));
+		/* Only need to update the size field */
+		size += GET_SIZE(GET_BLOCKHDR(next_block));
+
 		PUTW(GET_BLOCKHDR(bp), PACK(size, prev_alloc));
 		PUTW(GET_BLOCKFTR(bp), PACK(size, prev_alloc));
 	}
@@ -402,20 +404,25 @@ static void *coalesce(void *bp)
 	else if (!prev_alloc && next_alloc) { /* prev_block is free */
 		remove_from_list(prev_block, calc_min_bits(GET_THISSIZE(prev_block)));
 
-		size += GET_SIZE(GET_BLOCKHDR(GET_PREVBLOCK(bp)));
+		/* Need to update the size and prev_alloc field */
+		size += GET_THISSIZE(prev_block);
+		prev_alloc = GET_PREVALLOC(prev_block);
+
 		PUTW(GET_BLOCKFTR(bp), PACK(size, prev_alloc));
-		PUTW(GET_BLOCKHDR(GET_PREVBLOCK(bp)), PACK(size, prev_alloc));
-		bp = GET_PREVBLOCK(bp);
+		PUTW(GET_BLOCKHDR(prev_block), PACK(size, prev_alloc));
+		bp = prev_block;
 	}
 
 	else if (!prev_alloc && !next_alloc) { /* Both blocks are free */
 		remove_from_list(next_block, calc_min_bits(GET_THISSIZE(next_block)));
 		remove_from_list(prev_block, calc_min_bits(GET_THISSIZE(prev_block)));
 
-		size += GET_SIZE(GET_BLOCKHDR(GET_PREVBLOCK(bp))) +
-		  GET_SIZE(GET_BLOCKFTR(GET_NEXTBLOCK(bp)));
-		PUTW(GET_BLOCKHDR(GET_PREVBLOCK(bp)), PACK(size, 0));
-		PUTW(GET_BLOCKFTR(GET_NEXTBLOCK(bp)), PACK(size, 0));
+		/* Need to update the size and prev_alloc field */
+		size += GET_THISSIZE(prev_block) + GET_THISSIZE(next_block);
+		prev_alloc = GET_PREVALLOC(prev_block);
+
+		PUTW(GET_BLOCKHDR(GET_PREVBLOCK(bp)), PACK(size, prev_alloc));
+		PUTW(GET_BLOCKFTR(GET_NEXTBLOCK(bp)), PACK(size, prev_alloc));
 		bp = GET_PREVBLOCK(bp);
 	}
 
@@ -445,7 +452,7 @@ static void allocate(void *bp, size_t adjusted_size)
 		/*find_fit(adjusted_size, &available_index);*/
 		/* Marking this memory as NOT in teh free list, bp should be a
 			valid pointer to a node in a free list*/
-		/* remove_from_list(bp, calc_min_bits(adjusted_size)); */
+		 remove_from_list(bp, calc_min_bits(csize));
 		/*remove_from_list(bp, get_node_listindex(bp));*/
 
 		bp = GET_NEXTBLOCK(bp);
