@@ -150,6 +150,7 @@ static void *find_end_of_list(int list_index);
 static void add_to_list(char *bp, int list_index);
 static void remove_from_list(char *bp, int list_index);
 static void free_block(void *bp, size_t adjusted_size);
+static int get_node_listindex(void *bp);
 
 
 
@@ -175,7 +176,7 @@ int mm_init(void)
 
 	/* Initially allocate 1 page of memory plus room for
 		the prologue and epilogue blocks and free block header */
-	if((heap_start = mem_sbrk(ADJUSTED_PAGESIZE + (3 * WSIZE))) == NULL)
+	if((heap_start = mem_sbrk(ADJUSTED_PAGESIZE + (4 * WSIZE))) == NULL)
 		return -1;
 
 	heap_end = mem_heap_hi();
@@ -188,7 +189,7 @@ int mm_init(void)
 	PUTW(heap_start + (2 * WSIZE), PACK(DSIZE, THISALLOC | PREVALLOC));
 
 	/* Epilogue header */
-	PUTW(heap_start + ADJUSTED_PAGESIZE + ALIGNMENT	, PACK(0xB00B1E50, THISALLOC));
+	PUTW(heap_start + ADJUSTED_PAGESIZE + 3	* WSIZE, PACK(0xB00B1E50, THISALLOC));
 
 	/* Setup initial free block */
 	PUTW(heap_start + (3 * WSIZE), PACK(ADJUSTED_PAGESIZE, PREVALLOC));
@@ -429,7 +430,8 @@ static void allocate(void *bp, size_t adjusted_size)
 		/*find_fit(adjusted_size, &available_index);*/
 		/* Marking this memory as NOT in teh free list, bp should be a
 			valid pointer to a node in a free list*/
-		remove_from_list(bp, calc_min_bits(adjusted_size));
+		/* remove_from_list(bp, calc_min_bits(adjusted_size)); */
+		/*remove_from_list(bp, get_node_listindex(bp));*/
 
 		bp = GET_NEXTBLOCK(bp);
 		PUTW(GET_BLOCKHDR(bp), PACK(csize - adjusted_size, PREVALLOC));
@@ -441,7 +443,8 @@ static void allocate(void *bp, size_t adjusted_size)
 		PUTW(GET_BLOCKHDR(bp), PACK(csize, THISALLOC | is_prev_alloc));
 		PUTW(GET_BLOCKFTR(bp), PACK(csize, THISALLOC | is_prev_alloc));
 
-		remove_from_list(bp, calc_min_bits(csize));
+		/*remove_from_list(bp, calc_min_bits(csize));*/
+		/*remove_from_list(bp, get_node_listindex(bp));*/
 	}
 	TRACE("<<<---Leaving allocate()\n");
 }
@@ -513,6 +516,30 @@ static void *find_end_of_list(int list_index)
 	}
 	TRACE("<<<---Leaving find_end_of_list() returning 0x%X\n", bp);
 	return bp;
+}
+
+
+/** TODO: Better comment
+ *
+ */
+static int get_node_listindex(void *bp)
+{
+	mem_header *header = AS_MEM_HEADER(bp);
+	int i;
+	TRACE(">>>Entering get_node_listindex(bp=0x%X)\n", (unsigned int)bp);
+
+	while(header->prev_free != NULL) {
+		header = AS_MEM_HEADER(header->prev_free);
+	}
+
+	for (i = 0; i < FREELIST_COUNT; i++) {
+		if (free_lists[i] == (header + WSIZE)) {
+			TRACE("<<<---Leaving get_node_listindex(), returning %d (found list index)", i);
+			return i;
+		}
+	}
+	TRACE("<<<---Leaving get_node_listindex(), returning -1 (did NOT find list index)");
+	return -1;
 }
 
 
@@ -671,7 +698,7 @@ void debuggable_memset(void* addr, unsigned char value, size_t len)
 
 	/* I don't know if standard memset does any safety checks, but this one
 		sure as hell doesn't */
-	while (byte_pointer < len) {
+	while (byte_pointer < addr + len) {
 		*byte_pointer = value;
 		byte_pointer++;
 	}
@@ -709,100 +736,3 @@ int test_main(int argc, char* argv[])
 
 	return 0;
 }
-
-
-
-
-#ifdef _DEBUG
-
-/**
- * print_heap
- *
- *
- * Parameters:
- *
- * addr - The address at which to start examining memory
- *
- * len  - The amount of memory to examine
- *
- * byte_per_block - The number of bytes in a block (formatting)
- *
- * blocks_per_row - How many blocks to show on each line
- *
- *
- * Returns a dynamically allocated string that you can print to show the heap.
- */
-char* get_heap_str(char *addr, size_t len, size_t bytes_per_block, size_t blocks_per_row)
-{
-	char **rows;
-	char *rowbuffer, *output;
-	char *bytes = malloc(len);
-	unsigned int bptr, rowptr, byte_blockprogress, block_progress;
-	size_t rowlen, blockcount, rowcount, totalsize = 0;
-
-	if (len == 0 || bytes_per_block == 0 || blocks_per_row == 0)
-		return NULL;
-
-	blockcount = len / bytes_per_block + (len % bytes_per_block ? 1 : 0);
-	rowcount = blockcount / blocks_per_row + (blockcount % blocks_per_row ? 1 : 0);
-
-	rowlen = ((bytes_per_block + 1) * 2 + 3) * blocks_per_row  + 3 + (8);
-	rowbuffer = malloc(rowlen);
-
-	memset(rowbuffer, 0, rowlen);
-	rows = calloc(sizeof(char *), rowcount);
-	memset(rows, 0, sizeof(char*)*rowcount);
-
-	for (bptr = 0; bptr < len; bptr++) {
-		bytes[bptr] = *((char *)(bptr + addr));
-	}
-
-	bptr = 0;
-	rowptr = 0;
-	byte_blockprogress = 0;
-	block_progress = 0;
-	while (bptr < len) {
-
-		if (block_progress == 0) {
-			rowbuffer = malloc(rowlen);
-			sprintf(rowbuffer, "0x%X:  ", (unsigned int)(addr + bptr));
-		}
-
-		if (byte_blockprogress == 0) {
-			strcat(rowbuffer, "  0x");
-			block_progress++;
-		}
-
-		sprintf(rowbuffer + strlen(rowbuffer), "%X", (unsigned char)(*(addr + bptr)));
-		byte_blockprogress++;
-
-		bptr++;
-
-		if (byte_blockprogress >= bytes_per_block) {
-			byte_blockprogress = 0;
-			block_progress++;
-		}
-
-		if (block_progress >= blocks_per_row) {
-			block_progress = 0;
-			strcat(rowbuffer, "\n");
-			rows[rowptr] = rowbuffer;
-			rowptr++;
-			totalsize += strlen(rowbuffer);
-		}
-
-	}
-
-	output = malloc(totalsize+1);
-	memset(output, 0, totalsize+1);
-	for (rowptr = 0; rowptr < rowcount; rowptr++) {
-		strcat(output, rows[rowptr]);
-		free(rows[rowptr]);
-	}
-	free(rows);
-	free(bytes);
-
-	return output;
-}
-
-#endif
