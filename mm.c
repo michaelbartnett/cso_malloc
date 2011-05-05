@@ -40,7 +40,7 @@
 	#define test_main main
 #endif
 
-#define _DEBUG
+/*#define _DEBUG*/
 
 #ifdef _DEBUG
 	#include "config.h" /* Need access to MAX_HEAP for debugging purposes */
@@ -50,6 +50,7 @@
 	void mm_check();
 #else
 	#define TRACE(...) ;
+	#define mm_check() ;
 #endif
 
 /*********************************************************
@@ -83,7 +84,7 @@ team_t team = {
 
 
 #define THISALLOC 0x01
-#define PREVALLOC (0x01 << 1)
+#define PREVALLOC 0x02
 
 /* Self-explanatory */
 #define MAX(x, y) ((x) > (y)? (x) : (y))
@@ -91,6 +92,10 @@ team_t team = {
 /* Read and write word value at address 'p' */
 #define GETW(p) (*(unsigned int *)(p))
 #define PUTW(p, val) (*(unsigned int *)(p) = (val))
+
+/* Read and write byte value at address 'p' */
+#define GETB(p) (*(unsigned char *)(p))
+#define PUTB(p, val) (*(unsigned char *)(p) = (val))
 
 /* Pack a size and allocated bit into a word */
 #define PACK(size, alloc) ((size) | (alloc))
@@ -107,6 +112,10 @@ team_t team = {
 #define GET_PREVALLOC(bp) ((GETW(GET_BLOCKHDR(bp)) & PREVALLOC))
 /* Read <next allocated?> field */
 #define GET_NEXTALLOC(bp) (GET_ALLOC(GET_BLOCKHDR(GET_NEXTBLOCK(bp))))
+/* Read <is allocated?> field--convenience for GET_ALLOC() using payload ptr */
+#define GET_THISALLOC(bp) (GET_ALLOC(GET_BLOCKHDR(bp)))
+/* Get address of payload */
+#define GET_PAYLOAD(bp) ((char *)(bp) + WSIZE)
 
 /*  */
 #define GET_NEXTBLOCK(bp) ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))
@@ -251,7 +260,7 @@ void *mm_malloc(size_t size)
 		return NULL;
 	}
 
-	bp += WSIZE; /* Move bp up to payload address */
+/*	bp += WSIZE; /* Move bp up to payload address */
 	allocate(bp, adjusted_size);
 
 	mm_check();
@@ -340,8 +349,11 @@ static void *extend_heap(size_t adjusted_size)
 
 	/*memset((unsigned int *)bp, 0xDEADBEEF, adjusted_size/WSIZE);*/
 
-	/* Initialize free block header/footer and the epilogue header */
-	prev_alloc = GET_PREVALLOC(bp);
+	/* Initialize free block header/footer and the epilogue header.
+		heap_end points to one byte before the next payload, so reading
+		the PREVALLOC field of heap_end + 1 will yield the actual prev-alloc
+		for the block just before the end of the heap. */
+	prev_alloc = GET_PREVALLOC(heap_end + 1);
 
 	/* Free block header */
 	PUTW(GET_BLOCKHDR(bp), PACK(adjusted_size, prev_alloc));
@@ -417,6 +429,7 @@ static void allocate(void *bp, size_t adjusted_size)
 {
 	size_t csize = GET_SIZE(GET_BLOCKHDR(bp));
 	size_t is_prev_alloc;
+	void *helper_p;
 	/*int available_index;*/
 
 	TRACE(">>>Entering allocate(bp=0x%X, adjusted_size=%u)\n", (unsigned int)bp, adjusted_size);
@@ -442,6 +455,18 @@ static void allocate(void *bp, size_t adjusted_size)
 	else {
 		PUTW(GET_BLOCKHDR(bp), PACK(csize, THISALLOC | is_prev_alloc));
 		PUTW(GET_BLOCKFTR(bp), PACK(csize, THISALLOC | is_prev_alloc));
+
+		/* Make sure the next block's header has the prevalloc field marked */
+		bp = GET_BLOCKHDR(GET_NEXTBLOCK(bp));
+		PUTW(bp, GETW(bp) | PREVALLOC);
+/*		bp = GET_BLOCKFTR(GET_PAYLOAD(bp));*/
+		/* Same goes for the footer if it isn't allocted */
+		/*
+helper_p = GET_BLOCKFTR(GET_PAYLOAD(bp));
+		PUTW(helper_p, GETW(helper_p) | (GET_THISALLOC(helper_p) ? 0 : PREVALLOC));
+*/
+
+
 
 		/*remove_from_list(bp, calc_min_bits(csize));*/
 		/*remove_from_list(bp, get_node_listindex(bp));*/
@@ -699,7 +724,7 @@ void debuggable_memset(void* addr, unsigned char value, size_t len)
 	/* I don't know if standard memset does any safety checks, but this one
 		sure as hell doesn't */
 	while (byte_pointer < addr + len) {
-		*byte_pointer = value;
+		PUTB(byte_pointer, value);
 		byte_pointer++;
 	}
 	TRACE("...... ok, dun memsetting ......\n");
