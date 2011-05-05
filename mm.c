@@ -540,17 +540,24 @@ static void remove_from_list(char *bp, int list_index)
 	TRACE("        header->prev_free = %0x%X\n", header->prev_free);
 
 	if (header->next_free != NULL) {
+		TRACE("        entering if statement 1\n");
 		next_header = AS_MEM_HEADER(header->next_free);
+		TRACE("			got to middle section\n");
 		next_header->prev_free = header->prev_free;
+		TRACE("        leaving if statement 1\n");
 	}
 
 	if (header->prev_free != NULL) {
+		TRACE("        entering if statement 2\n");
 		prev_header = AS_MEM_HEADER(header->prev_free);
 		prev_header->next_free = header->next_free;
+		TRACE("        leaving if statement 2\n");
 	}
 
 	if (free_lists[list_index] == bp) {
+		TRACE("        entering if statement 3\n");
 		free_lists[list_index] = header->next_free;
+		TRACE("        leaving if statement 3\n");
 	}
 	TRACE("<<<---Leaving remove_from_list()\n");
 }
