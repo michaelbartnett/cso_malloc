@@ -200,7 +200,7 @@ int mm_init(void)
 	PUTW(heap_start + (2 * WSIZE), PACK(DSIZE, THISALLOC | PREVALLOC));
 
 	/* Epilogue header */
-	PUTW(heap_start + ADJUSTED_PAGESIZE + 3	* WSIZE, PACK(0xB00B1E50, THISALLOC));
+	PUTW(heap_start + ADJUSTED_PAGESIZE + 3	* WSIZE, PACK(0xEA7F00D0, THISALLOC));
 
 	/* Setup initial free block */
 	PUTW(heap_start + (3 * WSIZE), PACK(ADJUSTED_PAGESIZE, PREVALLOC));
@@ -364,7 +364,7 @@ static void *extend_heap(size_t adjusted_size)
 	PUTW(GET_BLOCKFTR(bp), PACK(adjusted_size, prev_alloc));
 
 	/* New epilogue header */
-	PUTW(GET_BLOCKHDR(GET_NEXTBLOCK(bp)), PACK(0xB00B1E50, THISALLOC));
+	PUTW(GET_BLOCKHDR(GET_NEXTBLOCK(bp)), PACK(0xEA7F00D0, THISALLOC));
 	heap_end = mem_heap_hi();
 
 	TRACE("<<<---Leaving extend_heap() with a call to coalesce()\n");
