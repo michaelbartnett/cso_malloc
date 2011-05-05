@@ -114,6 +114,8 @@ team_t team = {
 #define GET_NEXTALLOC(bp) (GET_ALLOC(GET_BLOCKHDR(GET_NEXTBLOCK(bp))))
 /* Read <is allocated?> field--convenience for GET_ALLOC() using payload ptr */
 #define GET_THISALLOC(bp) (GET_ALLOC(GET_BLOCKHDR(bp)))
+/* Read <size> field--convenience for GET_SIZE() using payload ptr */
+#define GET_THISSIZE(bp) (GET_SIZE(GET_BLOCKHDR(bp)))
 /* Get address of payload */
 #define GET_PAYLOAD(bp) ((char *)(bp) + WSIZE)
 
@@ -390,7 +392,7 @@ static void *coalesce(void *bp)
 	/* Case 1, Both blocks allocated, does not need its own if statement */
 
 	if (prev_alloc && !next_alloc) { /* next_block is free */
-		remove_from_list(next_block, calc_min_bits(GET_SIZE(next_block)));
+		remove_from_list(next_block, calc_min_bits(GET_THISSIZE(next_block)));
 
 		size += GET_SIZE(GET_BLOCKHDR(GET_NEXTBLOCK(bp)));
 		PUTW(GET_BLOCKHDR(bp), PACK(size, prev_alloc));
@@ -398,7 +400,7 @@ static void *coalesce(void *bp)
 	}
 
 	else if (!prev_alloc && next_alloc) { /* prev_block is free */
-		remove_from_list(prev_block, calc_min_bits(GET_SIZE(prev_block)));
+		remove_from_list(prev_block, calc_min_bits(GET_THISSIZE(prev_block)));
 
 		size += GET_SIZE(GET_BLOCKHDR(GET_PREVBLOCK(bp)));
 		PUTW(GET_BLOCKFTR(bp), PACK(size, prev_alloc));
@@ -407,8 +409,8 @@ static void *coalesce(void *bp)
 	}
 
 	else if (!prev_alloc && !next_alloc) { /* Both blocks are free */
-		remove_from_list(next_block, calc_min_bits(GET_SIZE(next_block)));
-		remove_from_list(prev_block, calc_min_bits(GET_SIZE(prev_block)));
+		remove_from_list(next_block, calc_min_bits(GET_THISSIZE(next_block)));
+		remove_from_list(prev_block, calc_min_bits(GET_THISSIZE(prev_block)));
 
 		size += GET_SIZE(GET_BLOCKHDR(GET_PREVBLOCK(bp))) +
 		  GET_SIZE(GET_BLOCKFTR(GET_NEXTBLOCK(bp)));
@@ -506,16 +508,18 @@ static void * find_fit(size_t block_size, int *result_index)
 	int list_index,
 		/* Make sure we search according to size & alignment requirements */
 		min_index = /*ADJUST_WORDCOUNT(*/calc_min_bits(block_size)/*)*/;
+	void *fitptr;
 
 	TRACE(">>>Entering find_fit(block_size=%u, [retval result_index])\n", block_size);
 
 	/* Look at the free list with the minimum size needed to hold block_size */
 	for (list_index = min_index; list_index < FREELIST_COUNT; list_index++) {
+		fitptr = free_lists[list_index];
 		/* If the head of the list is not null, we can use it */
-		if (free_lists[list_index] != NULL) {
+		if (fitptr != NULL && GET_THISSIZE(fitptr) >= block_size) {
 			*result_index = list_index;
 			TRACE("<<<---Leaving find_fit, result_index=%d\n", *result_index);
-			return (void *)free_lists[list_index];
+			return (void *)fitptr;
 		}
 		/* Otherwise, we can't */
 	}
@@ -671,7 +675,6 @@ void mm_check()
 		bp++;
 	}
 }
-#endif
 
 
 
@@ -761,3 +764,4 @@ int test_main(int argc, char* argv[])
 
 	return 0;
 }
+#endif
