@@ -178,7 +178,6 @@ int mm_init(void)
 	if((heap_start = mem_sbrk(ADJUSTED_PAGESIZE + (3 * WSIZE))) == NULL)
 		return -1;
 
-	/* TODO: Determine if I actually need this variable */
 	heap_end = mem_heap_hi();
 
 	/* Alignment word */
@@ -189,7 +188,7 @@ int mm_init(void)
 	PUTW(heap_start + (2 * WSIZE), PACK(DSIZE, THISALLOC | PREVALLOC));
 
 	/* Epilogue header */
-	PUTW(heap_start + ADJUSTED_PAGESIZE, PACK(0xB00B1E50, THISALLOC));
+	PUTW(heap_start + ADJUSTED_PAGESIZE + ALIGNMENT	, PACK(0xB00B1E50, THISALLOC));
 
 	/* Setup initial free block */
 	PUTW(heap_start + (3 * WSIZE), PACK(ADJUSTED_PAGESIZE, PREVALLOC));
@@ -687,19 +686,19 @@ int test_main(int argc, char* argv[])
 
 	arr[0] = mm_malloc(2040);
 	TRACE("Got pointer to memory from malloc, 0x%X.\n Memsetting to 0xFE\n", (unsigned int)arr[0]);
-	memset(arr[0], 0xFE, 2040);
+	debuggable_memset(arr[0], 0xFE, 2040);
 
 	arr[1] = mm_malloc(2040);
 	TRACE("Got pointer to memory from malloc, 0x%X.\n. Memsetting to 0xF1\n", (unsigned int)arr[1]);
-	memset(arr[1], 0xF1, 2040);
+	debuggable_memset(arr[1], 0xF1, 2040);
 
 	arr[2] = mm_malloc(48);
 	TRACE("Got pointer to memory from malloc, 0x%X.\n Memsetting to 0xF2\n", (unsigned int)arr[2]);
-	memset(arr[2], 0xF2, 48);
+	debuggable_memset(arr[2], 0xF2, 48);
 
 	arr[3] = mm_malloc(4072);
 	TRACE("Got pointer to memory from malloc, 0x%X.\n Memsetting to 0xF3\n", (unsigned int)arr[3]);
-	memset(arr[3], 0xF3, 4072);
+	debuggable_memset(arr[3], 0xF3, 4072);
 
 	return 0;
 }

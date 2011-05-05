@@ -1,29 +1,30 @@
 #!/usr/bin/env python
-
+from __future__ import print_function
 import sys
 import os
+
 
 argc = len(sys.argv)
 
 def usage():
-	print
-	print "Usage: gdbformat [filename]"
-	print
-	print "Takes input in the form of output given by the gdb command 'x/wx'"
-	print "and formats it such that there is one word per row, allowing you"
-	print "to see the addresses of individual words in memory."
-	print
-	print "The output is written to stdout, so you can use pipes and"
-	print "redirections with gdbformat. Common use is to tell gdb to"
-	print "log to a specific file, turn on logging, run a command,"
-	print "turn off logging, and then run gdbformat with your log file"
-	print "as the [filename] argument, optionally redirecting to a"
-	print "second file."
-	print
-	print "filename - should be an existing file"
-	print "           If no filename is provided, gdbformat read from stdin."
-	print "           Enter EOF (Ctrl+D) to end your input."
-	print
+	print()
+	print("Usage: gdbformat [filename]")
+	print()
+	print("Takes input in the form of output given by the gdb command 'x/wx'")
+	print("and formats it such that there is one word per row, allowing you")
+	print("to see the addresses of individual words in memory.")
+	print()
+	print("The output is written to stdout, so you can use pipes and")
+	print("redirections with gdbformat. Common use is to tell gdb to")
+	print("log to a specific file, turn on logging, run a command,")
+	print("turn off logging, and then run gdbformat with your log file")
+	print("as the [filename] argument, optionally redirecting to a")
+	print("second file.")
+	print()
+	print("filename - should be an existing file")
+	print("           If no filename is provided, gdbformat read from stdin.")
+	print("           Enter EOF (Ctrl+D) to end your input.")
+	print()
 
 
 
@@ -41,26 +42,62 @@ def read_input(input, output):
 				output.append(s)
 
 
+def get_sequential_filename(filename):
+	def gsq_recursive(f, r):
+		root, ext = os.path.splitext(f)
+		newfile = root + '_' + str(r) + ext
+		if os.path.isfile(newfile) or os.path.isdir(newfile):
+			return gsq_recursive(filename, r+1)
+		else:
+			return newfile
+	
+	return gsq_recursive(filename, 0)
+
+
 
 def main():
+	ofstart = 3
 	if argc < 2:
 		input = sys.stdin
 	elif sys.argv[1] == '-h' or sys.argv[1] == '--help':
 		usage();
 		sys.exit(0)
+	elif sys.argv[1] == '-o':
+		ofstart -= 1
+		input = sys.stdin
 	else:
 		if not os.path.isfile(sys.argv[1]):
-			print "Error: filename '%s' not found." % (sys.argv[1])
+			print("Error: filename '%s' not found." % (sys.argv[1]))
 			usage()
 			sys.exit(1)
-
 		input = open(sys.argv[1], 'r')
+
+	outfiles = []
+	if argc >= 3:
+		def validate_files(filenames):
+			result = []
+			for f in filenames:
+				if os.path.isfile(f) or os.path.isdir(f):
+					result.append(get_sequential_filename(f))
+				elif f != '-stdout' and f != '-o' and f != '-h' and f != '--help':
+					result.append(f)
+			return result
+
+		outfiles = [open(f, 'w') for f in validate_files(sys.argv[ofstart - 1:])]
+	else:
+		outfiles = [sys.stdout]
 
 	output = []
 
 	read_input(input, output)
 
-	print ''.join(output)
+	result = ''.join(output)
+	for of in outfiles:
+		print(result, file=of)
+
+	if '-stdout' in sys.argv[ofstart - 1:]:
+		print(result)
+
 # 	print str(output)
 
 if __name__ == '__main__':
