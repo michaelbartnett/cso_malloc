@@ -47,7 +47,7 @@
 #endif
 
 /*#define _DEBUG*/
-#define DO_MM_CHECK
+/*#define DO_MM_CHECK*/
 
 #ifdef _DEBUG
 	#define TRACE(...) printf(__VA_ARGS__); fflush(stdout)
@@ -61,12 +61,14 @@
 		extern int traceop_index;
 		extern int traceop_ptr;
 		extern traceop_t* trace_operations;
+		extern char* current_trace_name;
 	#endif
 #else
 	#define TRACE(...) ;
 #endif
 
 #ifdef DO_MM_CHECK
+	/*#define DO_HEAP_OVERWRITE_CHECK*/
 	/*
 	 * Maximum heap size in bytes
 	 * Copied from config.h
@@ -695,46 +697,6 @@ static void add_to_list(char *bp, int list_index)
 }
 
 
-#ifdef DO_MM_CHECK
-/**
- *
- */
-void mm_check()
-{
-	int i;
-	char *bp;
-
-	/*printf("----------------------------->>>>>>>Running mm_check.\n");*/
-
-	/* First make sure heap_end is set appropriately */
-	assert(heap_end == mem_heap_hi());
-
-	/* Then check to ensure that we have no data past MAX_HEAP */
-	assert(heap_end < heap_start + MAX_HEAP);
-
-
-	/* Then make sure we haven't written past mem_heap_hi() */
-	bp = heap_end + 1;
-	while (bp < heap_start + MAX_HEAP) {
-		assert((*bp) == 0);
-		bp++;
-	}
-
-	/* Then make sure the blocks in our free lists are actually free */
-	for (i = 0; i < FREELIST_COUNT; i++) {
-		if (free_lists[i] != NULL) {
-			bp = free_lists[i];
-			do {
-				assert(GET_THISSIZE(bp) < MAX_BLOCK_ALLOCSIZE);
-				bp = MEMHEADER_FROM_PAYLOAD(bp)->next_free;
-			} while (bp != NULL);
-		}
-	}
-}
-#endif
-
-
-#ifdef _DEBUG
 
 
 /************************  Welcome to testing land!  **************************/
@@ -770,7 +732,57 @@ void mm_check()
 
 
 
+#ifdef DO_MM_CHECK
+/**
+ *
+ */
+void mm_check()
+{
+	int i;
+	char *bp;
 
+	/*printf("----------------------------->>>>>>>Running mm_check.\n");*/
+
+	/* First make sure heap_end is set appropriately */
+	assert(heap_end == mem_heap_hi());
+
+	/* Then check to ensure that we have no data past MAX_HEAP */
+	assert(heap_end < heap_start + MAX_HEAP);
+
+
+	#ifdef DO_HEAP_OVERWRITE_CHECK
+	/* Then make sure we haven't written past mem_heap_hi() */
+	bp = heap_end + 1;
+	while (bp < heap_start + MAX_HEAP) {
+		assert((*bp) == 0);
+		bp++;
+	}
+	#endif
+
+	/* Then make sure the blocks in our free lists are actually free */
+	for (i = 0; i < FREELIST_COUNT; i++) {
+		if (free_lists[i] != NULL) {
+			bp = free_lists[i];
+			do {
+				assert(!GET_THISALLOC(bp));
+				assert(GET_THISSIZE(bp) < MAX_BLOCK_ALLOCSIZE);
+				bp = MEMHEADER_FROM_PAYLOAD(bp)->next_free;
+			} while (bp != NULL);
+		}
+	}
+
+	bp = heap_start + 4 * WSIZE;
+
+	while (bp < heap_end) {
+		assert(GET_THISSIZE(bp) < MAX_BLOCK_ALLOCSIZE);
+		bp = GET_NEXTBLOCK(bp);
+	}
+}
+#endif
+
+
+
+#ifdef _DEBUG
 /**
  * debuggable_memset
  *
