@@ -60,7 +60,7 @@ end
 define writeheap
 	set logging off
 
-	echo process_heaptrace running\n
+	echo writeheap running\n
 	echo Logging will be disabled after this command is run.\n
 
 	echo Examining address range $arg0 to $arg1 . . . 
@@ -77,7 +77,7 @@ define writeheap
 
 	echo Done.\n
 
-	echo Running pretty print python script . . . 
+	echo Running gdbformat . . .\ 
 	shell ./gdbformat .gdblog_heaptrace.log -o gdboutput.txt
 	echo Done.\n
 end
@@ -92,5 +92,5 @@ end
 # Assumes there is a heap_start and heap_end variable
 ###########################################################
 define dumpheap
-	process_heaptrace heap_start heap_end
+	writeheap heap_start heap_end
 end

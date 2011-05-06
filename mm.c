@@ -137,7 +137,7 @@ team_t team = {
 #define PACK(size, alloc) ((size) | (alloc))
 
 /* Read size field */
-#define GET_SIZE(p) (GETW(p) & 0xFFFFFFF8)
+#define GET_SIZE(p) (GETW(p) & ~(THISALLOC | PREVALLOC))
 /* Read <allocated?> field */
 #define GET_ALLOC(p) (GETW(p) & THISALLOC)
 
@@ -476,16 +476,14 @@ static void free_block(void *bp, size_t adjusted_size)
  */
 static void allocate(void *bp, size_t adjusted_size)
 {
-	size_t csize = GET_SIZE(GET_BLOCKHDR(bp));
-	size_t is_prev_alloc;
+	size_t csize = GET_THISSIZE(bp);
+	size_t is_prev_alloc = GET_PREVALLOC(bp);
 	/*void *helper_p; TODO: Delete this*/
 	/*int available_index;*/
 
 	TRACE(">>>Entering allocate(bp=0x%X, adjusted_size=%u)\n", (unsigned int)bp, adjusted_size);
 
 	if ((csize - adjusted_size) >= (MIN_SIZE)) {
-		is_prev_alloc = GET_PREVALLOC(bp);
-
 		PUTW(GET_BLOCKHDR(bp), PACK(adjusted_size, THISALLOC | is_prev_alloc));
 		PUTW(GET_BLOCKFTR(bp), PACK(adjusted_size, THISALLOC | is_prev_alloc));
 
