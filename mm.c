@@ -21,6 +21,12 @@
 
 
 
+
+
+
+
+
+
 /*
  * The To-Do list:
  *
@@ -156,7 +162,7 @@ static size_t ADJUSTED_PAGESIZE;
 static char * heap_start = NULL;
 static char * heap_end = NULL;
 
-static int calc_min_bits(size_t size);
+static int calc_list_index(size_t size);
 static void *extend_heap(size_t adjusted_size);
 static void *coalesce(void *bp);
 static void allocate(void *bp, size_t adjusted_size);
@@ -209,14 +215,14 @@ int mm_init(void)
 	/* Setup initial free block */
 	PUTW(heap_start + (3 * WSIZE), PACK(ADJUSTED_PAGESIZE, PREVALLOC));
 	PUTW((heap_end - WSIZE + 1) - WSIZE, PACK(ADJUSTED_PAGESIZE, PREVALLOC));
-	add_to_list(heap_start + (4 * WSIZE), calc_min_bits(ADJUSTED_PAGESIZE));
+	add_to_list(heap_start + (4 * WSIZE), calc_list_index(ADJUSTED_PAGESIZE));
 
 /*
 	PUTW(GET_BLOCKHDR(heap_start + (2 * ALIGNMENT)), PACK(PAGE_SIZE, 0));
 	PUTW(GET_BLOCKFTR(heap_start + (2 * ALIGNMENT)), PACK(PAGE_SIZE, 0));
 
 	/* Ensure first block of free memory is aligned to * /
-	free_lists[calc_min_bits(PAGE_WORDS)] = heap_start + ALIGNMENT;
+	free_lists[calc_list_index(PAGE_WORDS)] = heap_start + ALIGNMENT;
 	mem_header *header = AS_MEM_HEADER(heap_start + (2 * ALIGNMENT));
 	header->prev_free = NULL;
 	header->next_free = NULL;
@@ -284,7 +290,7 @@ void mm_free(void *ptr)
 	TRACE(">>>Entering mm_free(ptr=0x%X)\n", (unsigned int)ptr);
 
 	free_block(ptr, GET_THISSIZE(ptr));
-	add_to_list(ptr, calc_min_bits(GET_THISSIZE(ptr)));
+	add_to_list(ptr, calc_list_index(GET_THISSIZE(ptr)));
 
 	coalesce(ptr);
 
@@ -323,14 +329,14 @@ void *mm_realloc(void *ptr, size_t size)
  * Calculate bits needed to store a value
  * This is used to determine which free list to look in.
  */
-static int calc_min_bits(size_t size)
+static int calc_list_index(size_t size)
 {
 	int bits = 0;
-	TRACE(">>>Entering calc_min_bits(size=%u)\n", size);
-	while (size >> bits > 1) {
+	TRACE(">>>Entering calc_list_index(size=%u)\n", size);
+	while ((size >> bits > 1) && (bits + 1 < FREELIST_COUNT)) {
 		bits++;
 	}
-	TRACE("<<<---Leaving calc_min_bits(), returning %d\n", bits);
+	TRACE("<<<---Leaving calc_list_index(), returning %d\n", bits);
 	return bits;
 }
 
@@ -402,7 +408,7 @@ static void *coalesce(void *bp)
 	/* Case 1, Both blocks allocated, does not need its own if statement */
 
 	if (prev_alloc && !next_alloc) { /* next_block is free */
-		remove_from_list(next_block, calc_min_bits(GET_THISSIZE(next_block)));
+		remove_from_list(next_block, calc_list_index(GET_THISSIZE(next_block)));
 
 		/* Only need to update the size field */
 		size += GET_SIZE(GET_BLOCKHDR(next_block));
@@ -412,7 +418,7 @@ static void *coalesce(void *bp)
 	}
 
 	else if (!prev_alloc && next_alloc) { /* prev_block is free */
-		remove_from_list(prev_block, calc_min_bits(GET_THISSIZE(prev_block)));
+		remove_from_list(prev_block, calc_list_index(GET_THISSIZE(prev_block)));
 
 		/* Need to update the size and prev_alloc field */
 		size += GET_THISSIZE(prev_block);
@@ -424,8 +430,8 @@ static void *coalesce(void *bp)
 	}
 
 	else if (!prev_alloc && !next_alloc) { /* Both blocks are free */
-		remove_from_list(next_block, calc_min_bits(GET_THISSIZE(next_block)));
-		remove_from_list(prev_block, calc_min_bits(GET_THISSIZE(prev_block)));
+		remove_from_list(next_block, calc_list_index(GET_THISSIZE(next_block)));
+		remove_from_list(prev_block, calc_list_index(GET_THISSIZE(prev_block)));
 
 		/* Need to update the size and prev_alloc field */
 		size += GET_THISSIZE(prev_block) + GET_THISSIZE(next_block);
@@ -436,7 +442,7 @@ static void *coalesce(void *bp)
 		bp = GET_PREVBLOCK(bp);
 	}
 
-	add_to_list(bp, calc_min_bits(size));
+	add_to_list(bp, calc_list_index(size));
 	TRACE("<<<---Leaving coalesce()\n");
 	return bp;
 }
@@ -462,14 +468,14 @@ static void allocate(void *bp, size_t adjusted_size)
 		/*find_fit(adjusted_size, &available_index);*/
 		/* Marking this memory as NOT in teh free list, bp should be a
 			valid pointer to a node in a free list*/
-		 remove_from_list(bp, calc_min_bits(csize));
+		 remove_from_list(bp, calc_list_index(csize));
 		/*remove_from_list(bp, get_node_listindex(bp));*/
 
 		bp = GET_NEXTBLOCK(bp);
 		PUTW(GET_BLOCKHDR(bp), PACK(csize - adjusted_size, PREVALLOC));
 		PUTW(GET_BLOCKFTR(bp), PACK(csize - adjusted_size, PREVALLOC));
 
-		add_to_list(bp, calc_min_bits(csize - adjusted_size));
+		add_to_list(bp, calc_list_index(csize - adjusted_size));
 	}
 	else {
 		PUTW(GET_BLOCKHDR(bp), PACK(csize, THISALLOC | is_prev_alloc));
@@ -487,7 +493,7 @@ helper_p = GET_BLOCKFTR(GET_PAYLOAD(bp));
 
 
 
-		/*remove_from_list(bp, calc_min_bits(csize));*/
+		/*remove_from_list(bp, calc_list_index(csize));*/
 		/*remove_from_list(bp, get_node_listindex(bp));*/
 	}
 	TRACE("<<<---Leaving allocate()\n");
@@ -526,7 +532,7 @@ static void * find_fit(size_t block_size, int *result_index)
 {
 	int list_index,
 		/* Make sure we search according to size & alignment requirements */
-		min_index = /*ADJUST_WORDCOUNT(*/calc_min_bits(block_size)/*)*/;
+		min_index = /*ADJUST_WORDCOUNT(*/calc_list_index(block_size)/*)*/;
 	void *fitptr;
 
 	TRACE(">>>Entering find_fit(block_size=%u, [retval result_index])\n", block_size);
