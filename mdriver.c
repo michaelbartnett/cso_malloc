@@ -134,6 +134,14 @@ static void unix_error(char *msg);
 static void malloc_error(int tracenum, int opnum, char *msg);
 static void app_error(char *msg);
 
+
+/*******************
+ * Ghetto debugging
+ ******************/
+ int trace_index = -1;
+
+
+
 /**************
  * Main routine
  **************/
@@ -583,6 +591,7 @@ static int eval_mm_valid(trace_t *trace, int tracenum, range_t **ranges)
 
 	/* Interpret each operation in the trace in order */
 	for (i = 0;  i < trace->num_ops;  i++) {
+		trace_index = i;
 		index = trace->ops[i].index;
 		size = trace->ops[i].size;
 
