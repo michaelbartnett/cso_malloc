@@ -30,7 +30,12 @@
 /*
  * The To-Do list:
  *
- *
+ * Traces to pass:
+ *	realloc2-bal.rep -> Segfault
+ *	random-bal.rep -> Segfault
+ *	random2-bal.rep -> Error!
+ *	coalescing-bal.rep -> Early segfault
+ *	realloc-bal.rep -> Error!
  */
 #include <stdio.h>
 #include <stdlib.h>
