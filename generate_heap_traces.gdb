@@ -49,7 +49,7 @@ end
 
 
 ###########################################################
-# process_heaptrace
+# writeheap
 #
 # Command for processing 7 writing heap trace to file
 #
@@ -57,7 +57,7 @@ end
 # $arg0 - The heap start address
 # $arg1 - The heap end address
 ###########################################################
-define process_heaptrace
+define writeheap
 	set logging off
 
 	echo process_heaptrace running\n
@@ -85,12 +85,12 @@ end
 
 
 ###########################################################
-# traceheap
+# dumpheap
 # 
-# Command to drive process_heaptrace
+# Command to drive writeheap
 #
 # Assumes there is a heap_start and heap_end variable
 ###########################################################
-define traceheap
+define dumpheap
 	process_heaptrace heap_start heap_end
 end
