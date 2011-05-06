@@ -47,22 +47,43 @@
 #endif
 
 /*#define _DEBUG*/
+#define DO_MM_CHECK
 
 #ifdef _DEBUG
-	#include "config.h" /* Need access to MAX_HEAP for debugging purposes */
 	#define TRACE(...) printf(__VA_ARGS__); fflush(stdout)
+	#define DO_MM_CHECK
 
-	/* We created this in our local copy of mdriver.c so we could we
-		exactly which trace was failing */
-	extern int trace_index;
-
-	char* get_heap_str(char *addr, size_t len, size_t bytes_per_block, size_t blocks_per_row);
-	void mm_check();
+	/* We created these globals variables in our local copy of mdriver.c so
+		we could track exactly which trace command was failing and also set
+		conditional breakpoints (ie: break mm_free if traceop_ptr == 158) */
+	typedef struct tag_traceop_t traceop_t;
+	extern int traceop_index;
+	extern int traceop_ptr;
 #else
 	#define TRACE(...) ;
-	#define mm_check() ;
 #endif
 
+#ifdef DO_MM_CHECK
+	/*
+	 * Maximum heap size in bytes
+	 * Copied from config.h
+	 */
+	#define MAX_HEAP (20*(1<<20))  /* 20 MB */
+
+	/*
+	 * Estimated maximum size that is ever allocated by traces
+	 */
+	#define MAX_BLOCK_ALLOCSIZE 1000000
+
+	/*
+	 * Wrapper macro for running mm_check
+	 */
+	#define RUN_MM_CHECK() mm_check()
+
+	void mm_check();
+#else
+	#define RUN_MM_CHECK() ;
+#endif
 /*********************************************************
  * NOTE TO STUDENTS: Before you do anything else, please
  * provide your team information in the following struct.
@@ -90,9 +111,9 @@ team_t team = {
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
 
 /* The size of a size_t type */
-#define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
+#define SIZE_T_SIZE (ALIGN(sizeof(size_t)))/* TODO: Delete this unless used */
 
-
+/* Bit flags for alloc fields in block headers */
 #define THISALLOC 0x01
 #define PREVALLOC 0x02
 
@@ -142,19 +163,20 @@ team_t team = {
 #define ADJUST_BYTESIZE(size) (ALIGN((ADJUST_WORDCOUNT(((size) + WSIZE - 1)/WSIZE)) * WSIZE))
 
 
-
 /* Using size segregated explicit free lists */
 static char * free_lists[FREELIST_COUNT]; /* Segregate by word size power of 2, up to 4096 words */
 
+
 /* Helper macro to get the mem_header of a payload pointer */
-#define AS_MEM_HEADER(p) ((mem_header *)GET_BLOCKHDR(p))
-/* Struct for making linked list manipulation easier (casting FTW) */
+#define MEMHEADER_FROM_PAYLOAD(p) ((mem_header *)GET_BLOCKHDR(p))
+#define PAYLOAD_FROM_MEMHEADER(mh) ((char *)((mh) + WSIZE))
+/* Struct for making linked list manipulation easier */
 typedef struct {			/* IMPORTANT!!! The next_free and prev_free fields*/
 	unsigned int size_alloc;/* of this struct point to the START of payload,  */
 	char *next_free;		/* not the start of the struct. Remember to always*/
 	char *prev_free;		/* adjust if you want to set the *_free of one	  */
-							/* mem_header to another mem_header.			  */
-} mem_header;
+} mem_header;				/* mem_header to another mem_header.			  */
+
 
 static size_t PAGE_SIZE;
 static size_t ADJUSTED_PAGESIZE;
@@ -183,7 +205,7 @@ int mm_init(void)
 	TRACE(">>>Entering mm_init()\n");
 	mem_init();
 
-	#ifdef _DEBUG
+	#ifdef DO_MM_CHECK
 		/* initialize the ENTIRE heap provided by memlib to 0x00 */
 		memset(mem_heap_lo(), 0, MAX_HEAP);
 	#endif
@@ -217,7 +239,7 @@ int mm_init(void)
 	PUTW((heap_end - WSIZE + 1) - WSIZE, PACK(ADJUSTED_PAGESIZE, PREVALLOC));
 	add_to_list(heap_start + (4 * WSIZE), calc_list_index(ADJUSTED_PAGESIZE));
 
-	mm_check();
+	RUN_MM_CHECK();
 	TRACE("<<<---Leaving mm_init()\n");
 	return 0;
 }
@@ -264,7 +286,7 @@ void *mm_malloc(size_t size)
 
 	allocate(bp, adjusted_size);
 
-	mm_check();
+	RUN_MM_CHECK();
 	TRACE("<<<---Leaving mm_malloc() returning 0x%X\n", bp);
 	return bp;
 }
@@ -449,7 +471,7 @@ static void allocate(void *bp, size_t adjusted_size)
 {
 	size_t csize = GET_SIZE(GET_BLOCKHDR(bp));
 	size_t is_prev_alloc;
-	void *helper_p;
+	/*void *helper_p; TODO: Delete this*/
 	/*int available_index;*/
 
 	TRACE(">>>Entering allocate(bp=0x%X, adjusted_size=%u)\n", (unsigned int)bp, adjusted_size);
@@ -547,16 +569,16 @@ static void *find_end_of_list(int list_index)
  */
 static int get_node_listindex(void *bp)
 {
-	mem_header *header = AS_MEM_HEADER(bp);
+	mem_header *header = MEMHEADER_FROM_PAYLOAD(bp);
 	int i;
 	TRACE(">>>Entering get_node_listindex(bp=0x%X)\n", (unsigned int)bp);
 
 	while(header->prev_free != NULL) {
-		header = AS_MEM_HEADER(header->prev_free);
+		header = MEMHEADER_FROM_PAYLOAD(header->prev_free);
 	}
 
 	for (i = 0; i < FREELIST_COUNT; i++) {
-		if (free_lists[i] == (header + WSIZE)) {
+		if (free_lists[i] == PAYLOAD_FROM_MEMHEADER(header)) {
 			TRACE("<<<---Leaving get_node_listindex(), returning %d (found list index)", i);
 			return i;
 		}
@@ -596,7 +618,7 @@ static int calc_list_index(size_t size)
  */
 static void remove_from_list(char *bp, int list_index)
 {
-	mem_header *header = AS_MEM_HEADER(bp);
+	mem_header *header = MEMHEADER_FROM_PAYLOAD(bp);
 	mem_header *next_header;
 	mem_header *prev_header;
 
@@ -607,7 +629,7 @@ static void remove_from_list(char *bp, int list_index)
 
 	if (header->next_free != NULL) {
 		TRACE("        entering if statement 1\n");
-		next_header = AS_MEM_HEADER(header->next_free);
+		next_header = MEMHEADER_FROM_PAYLOAD(header->next_free);
 		TRACE("			got to middle section\n");
 		next_header->prev_free = header->prev_free;
 		TRACE("        leaving if statement 1\n");
@@ -615,7 +637,7 @@ static void remove_from_list(char *bp, int list_index)
 
 	if (header->prev_free != NULL) {
 		TRACE("        entering if statement 2\n");
-		prev_header = AS_MEM_HEADER(header->prev_free);
+		prev_header = MEMHEADER_FROM_PAYLOAD(header->prev_free);
 		prev_header->next_free = header->next_free;
 		TRACE("        leaving if statement 2\n");
 	}
@@ -644,7 +666,7 @@ static void add_to_list(char *bp, int list_index)
 {
 	char *tail_payload;
 	mem_header *tail_node;
-	mem_header *current = AS_MEM_HEADER(bp);
+	mem_header *current = MEMHEADER_FROM_PAYLOAD(bp);
 
 	TRACE(">>>Entering add_to_list(bp=0x%X, list_index=%d)\n", (unsigned int)bp, list_index);
 
@@ -659,7 +681,7 @@ static void add_to_list(char *bp, int list_index)
 		return;
 	}
 
-	tail_node = AS_MEM_HEADER(tail_payload);
+	tail_node = MEMHEADER_FROM_PAYLOAD(tail_payload);
 
 	tail_node->next_free = bp;
 	current->prev_free = tail_payload;
@@ -667,30 +689,45 @@ static void add_to_list(char *bp, int list_index)
 	TRACE("<<<---Leaving add_to_list()\n");
 }
 
-#ifdef _DEBUG
+
+#ifdef DO_MM_CHECK
 /**
  *
  */
 void mm_check()
 {
-	/* First check to ensure that we have no data past MAX_HEAP */
-	assert(heap_end < heap_start + MAX_HEAP);
+	int i;
+	char *bp;
 
-	/* Next make sure heap_end is set appropriately */
+	/* First make sure heap_end is set appropriately */
 	assert(heap_end == mem_heap_hi());
 
+	/* Then check to ensure that we have no data past MAX_HEAP */
+	assert(heap_end < heap_start + MAX_HEAP);
+
+
 	/* Then make sure we haven't written past mem_heap_hi() */
-	char *bp = heap_end + 1;
+	bp = heap_end + 1;
 	while (bp < heap_start + MAX_HEAP) {
 		assert((*bp) == 0);
 		bp++;
 	}
+
+	/* Then make sure the blocks in our free lists are actually free */
+	for (i = 0; i < FREELIST_COUNT; i++) {
+		if (free_lists[i] != NULL) {
+			bp = free_lists[i];
+			do {
+				assert(GET_THISSIZE(bp) < MAX_BLOCK_ALLOCSIZE);
+				bp = MEMHEADER_FROM_PAYLOAD(bp)->next_free;
+			} while (bp != NULL);
+		}
+	}
 }
+#endif
 
 
-
-
-
+#ifdef _DEBUG
 
 
 /************************  Welcome to testing land!  **************************/
@@ -723,6 +760,9 @@ void mm_check()
 /*                                      "$$$""  							  */
 /*																			  */
 /***************************  It's a silly place  *****************************/
+
+
+
 
 /**
  * debuggable_memset
