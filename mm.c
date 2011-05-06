@@ -760,7 +760,7 @@ static  char *arr[] = {NULL, NULL, NULL, NULL, NULL};
 int test_main(int argc, char* argv[])
 {
 	mm_init();
-
+/*
 	arr[0] = mm_malloc(2040);
 	TRACE("Got pointer to memory from malloc, 0x%X.\n Memsetting to 0xFE\n", (unsigned int)arr[0]);
 	debuggable_memset(arr[0], 0xFE, 2040);
@@ -776,6 +776,10 @@ int test_main(int argc, char* argv[])
 	arr[3] = mm_malloc(4072);
 	TRACE("Got pointer to memory from malloc, 0x%X.\n Memsetting to 0xF3\n", (unsigned int)arr[3]);
 	debuggable_memset(arr[3], 0xF3, 4072);
+*/
+	int *temp = mm_malloc(100);
+	
+	mm_free(temp);
 
 	return 0;
 }
