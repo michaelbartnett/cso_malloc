@@ -47,7 +47,7 @@
 #endif
 
 /*#define _DEBUG*/
-#define DO_MM_CHECK
+/*#define DO_MM_CHECK*/
 
 #ifdef _DEBUG
 	#define TRACE(...) printf(__VA_ARGS__); fflush(stdout)
@@ -61,6 +61,7 @@
 		extern int traceop_index;
 		extern int traceop_ptr;
 		extern traceop_t* trace_operations;
+		extern char* current_trace_name;
 	#endif
 #else
 	#define TRACE(...) ;

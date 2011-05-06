@@ -12,6 +12,22 @@
 
 
 
+###########################################################
+# traceinfo
+# 
+# Prints the current trace
+#
+# Assumes there is a heap_start and heap_end variable
+###########################################################
+define traceinfo
+	printf "Current trace file: %s\n", current_trace_name
+	printf "\tOperation index: %d\n", traceop_index
+	printf "\tBlock pointer id: %d\n", traceop_ptr
+	output trace_operations[traceop_index]
+	echo \n
+end
+
+
 
 ###########################################################
 # examine_addr
