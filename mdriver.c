@@ -45,7 +45,7 @@ typedef struct range_t {
 } range_t;
 
 /* Characterizes a single trace operation (allocator request) */
-typedef struct {
+typedef struct tag_traceop_t {
 	enum {ALLOC, FREE, REALLOC} type; /* type of request */
 	int index;                        /* index for free() to use later */
 	int size;                         /* byte size of alloc/realloc request */
@@ -138,8 +138,9 @@ static void app_error(char *msg);
 /*******************
  * Ghetto debugging
  ******************/
- int trace_index = -1;
-
+int traceop_index = -1;
+int traceop_ptr = -1;
+traceop_t* trace_operations;
 
 
 /**************
@@ -589,11 +590,17 @@ static int eval_mm_valid(trace_t *trace, int tracenum, range_t **ranges)
 		return 0;
 	}
 
+	/* Set the main trace operation array global variable to help debug */
+	trace_operations = trace->ops;
+
 	/* Interpret each operation in the trace in order */
 	for (i = 0;  i < trace->num_ops;  i++) {
-		trace_index = i;
 		index = trace->ops[i].index;
 		size = trace->ops[i].size;
+
+		/* Set global per-trace variables for Michael and Nabil to debug with */
+		traceop_index = i;
+		traceop_ptr = index;
 
 		switch (trace->ops[i].type) {
 
