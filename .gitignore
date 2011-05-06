@@ -7,3 +7,5 @@
 /mdriver
 gdboutput*.txt
 /.gdblog_heaptrace.log
+/run_traces.log
+/mdriver.log

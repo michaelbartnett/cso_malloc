@@ -1,0 +1,27 @@
+#!/usr/bin/env python
+import subprocess
+import os
+import sys
+
+result = subprocess.call(['make'])
+if result != 0:
+	print('Compilation failed.')
+	sys.exit(result)
+
+trace_results = []
+
+logfile = open('run_traces.log', 'w')
+
+for f in os.listdir('traces'):
+	try:
+		trace_results.append(subprocess.check_call(['./mdriver', '-V', '-f', 'traces/%s' %(f)]))
+	except subprocess.CalledProcessError:
+		trace_results.append('Trace %s failed' %(f))
+
+for s in trace_results:
+	print('------------------------------------------' + os.linesep)
+	logfile.write('------------------------------------------' + os.linesep)
+	print(s + os.linesep)
+	logfile.write(s + os.linesep)
+	print('------------------------------------------' + os.linesep)
+	logfile.write('------------------------------------------' + os.linesep)

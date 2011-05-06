@@ -278,6 +278,12 @@ void *mm_malloc(size_t size)
 void mm_free(void *ptr)
 {
 	TRACE(">>>Entering mm_free(ptr=0x%X)\n", (unsigned int)ptr);
+
+	free_block(ptr, GET_THISSIZE(ptr));
+	add_to_list(ptr, calc_min_bits(GET_THISSIZE(ptr)));
+
+	coalesce(ptr);
+
 	TRACE("<<<---Leaving mm_free()\n");
 }
 
@@ -287,7 +293,7 @@ void mm_free(void *ptr)
 void *mm_realloc(void *ptr, size_t size)
 {
 	TRACE(">>>Entering mm_realloc(ptr=0x%X, size=%u)\n", (unsigned int)ptr, size);
-/*
+
 	void *oldptr = ptr;
 	void *newptr;
 	size_t copySize;
@@ -302,7 +308,7 @@ void *mm_realloc(void *ptr, size_t size)
 	mm_free(oldptr);
 	return newptr;
 
-*/
+
 	TRACE("<<<---Leaving mm_realloc()\n");
 	return NULL;
 }
@@ -495,8 +501,10 @@ static void free_block(void *bp, size_t adjusted_size)
 	TRACE(">>>Entering free_block(bp=0x%X, adjusted_size=%u)\n", (unsigned int)bp, adjusted_size);
 
 	/* Trying to free NULL pointers will only result in chaos */
+/*
     if(bp == NULL)
 		return;
+*/
 
 	is_prev_alloc = GET_PREVALLOC(bp);
 	size = GET_SIZE(GET_BLOCKHDR(bp));
