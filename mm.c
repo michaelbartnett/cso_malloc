@@ -217,16 +217,6 @@ int mm_init(void)
 	PUTW((heap_end - WSIZE + 1) - WSIZE, PACK(ADJUSTED_PAGESIZE, PREVALLOC));
 	add_to_list(heap_start + (4 * WSIZE), calc_list_index(ADJUSTED_PAGESIZE));
 
-/*
-	PUTW(GET_BLOCKHDR(heap_start + (2 * ALIGNMENT)), PACK(PAGE_SIZE, 0));
-	PUTW(GET_BLOCKFTR(heap_start + (2 * ALIGNMENT)), PACK(PAGE_SIZE, 0));
-
-	/* Ensure first block of free memory is aligned to * /
-	free_lists[calc_list_index(PAGE_WORDS)] = heap_start + ALIGNMENT;
-	mem_header *header = AS_MEM_HEADER(heap_start + (2 * ALIGNMENT));
-	header->prev_free = NULL;
-	header->next_free = NULL;
-*/
 	mm_check();
 	TRACE("<<<---Leaving mm_init()\n");
 	return 0;
@@ -272,7 +262,6 @@ void *mm_malloc(size_t size)
 		return NULL;
 	}
 
-/*	bp += WSIZE; /* Move bp up to payload address */
 	allocate(bp, adjusted_size);
 
 	mm_check();
@@ -282,15 +271,14 @@ void *mm_malloc(size_t size)
 
 
 
-/*
- * mm_free - Freeing a block does nothing.
+/** TODO: Better comment
+ * mm_free -
  */
 void mm_free(void *ptr)
 {
 	TRACE(">>>Entering mm_free(ptr=0x%X)\n", (unsigned int)ptr);
 
 	free_block(ptr, GET_THISSIZE(ptr));
-	add_to_list(ptr, calc_list_index(GET_THISSIZE(ptr)));
 
 	coalesce(ptr);
 
@@ -324,34 +312,17 @@ void *mm_realloc(void *ptr, size_t size)
 }
 
 
-/** TODO: Better comment
- * TODO: Rename this to something more meaningful
- * Calculate bits needed to store a value
- * This is used to determine which free list to look in.
- */
-static int calc_list_index(size_t size)
-{
-	int bits = 0;
-	TRACE(">>>Entering calc_list_index(size=%u)\n", size);
-	while ((size >> bits > 1) && (bits + 1 < FREELIST_COUNT)) {
-		bits++;
-	}
-	TRACE("<<<---Leaving calc_list_index(), returning %d\n", bits);
-	return bits;
-}
-
-
 /**
  * extend_heap(size_t adjusted_size)
  *
- * Extend the heap by number of words
+ * Extend the heap by number of bytes
  *
  * This differs from the example extend_heap function in that the parameter
  * passed is in BYTES rather than WORDS. Constantly converting between the two
  * is confusing and unnecessary.
  *
  * Furthermore, it should be a size already adjusted to fit byte and header
- * alignment. This method merely sets header/footer/successor as needed
+ * alignment. This function merely sets header/footer/successor as needed
  */
 static void *extend_heap(size_t adjusted_size)
 {
@@ -362,10 +333,6 @@ static void *extend_heap(size_t adjusted_size)
 
 	if ((long)(bp = mem_sbrk(adjusted_size)) == -1)
 		return NULL;
-
-/*	bp = ALIGN(bp); /* Maybe this will work! */
-
-	/*memset((unsigned int *)bp, 0xDEADBEEF, adjusted_size/WSIZE);*/
 
 	/* Initialize free block header/footer and the epilogue header.
 		heap_end points to one byte before the next payload, so reading
@@ -388,17 +355,18 @@ static void *extend_heap(size_t adjusted_size)
 	return coalesce(bp); /* coalesce handles adding block to free list */
 }
 
+
+
 /** TODO: Better comment
  * Concatenate adjacent blocks
  *
  * Should upkeep the free list. Assumes that bp is always a free block
+ * Also assumes that bp has not been added to a free list.
  */
 static void *coalesce(void *bp)
-{/* TODO: Cleanup variable declarations */
-	size_t prev_alloc/* = GET_ALLOC(GET_BLOCKFTR(GET_PREVBLOCK(bp)))*/;
-	prev_alloc = GET_PREVALLOC(bp);
-	size_t next_alloc/* = GET_ALLOC(GET_BLOCKHDR(GET_NEXTBLOCK(bp)))*/;
-	next_alloc = GET_NEXTALLOC(bp);
+{
+	size_t prev_alloc = GET_PREVALLOC(bp);
+	size_t next_alloc = GET_NEXTALLOC(bp);
 	size_t size = GET_SIZE(GET_BLOCKHDR(bp));
 	char *next_block = GET_NEXTBLOCK(bp);
 	char *prev_block = GET_PREVBLOCK(bp);
@@ -406,7 +374,6 @@ static void *coalesce(void *bp)
 	TRACE(">>>Entering coalesce(bp=0x%X)\n", (unsigned int)bp);
 
 	/* Case 1, Both blocks allocated, does not need its own if statement */
-
 	if (prev_alloc && !next_alloc) { /* next_block is free */
 		remove_from_list(next_block, calc_list_index(GET_THISSIZE(next_block)));
 
@@ -442,9 +409,37 @@ static void *coalesce(void *bp)
 		bp = GET_PREVBLOCK(bp);
 	}
 
+	/* coalesce() is always called after a block is marked free
+		so it needs to add the block to the appropriate free list */
 	add_to_list(bp, calc_list_index(size));
 	TRACE("<<<---Leaving coalesce()\n");
 	return bp;
+}
+
+
+/** TODO: Better comment
+ * Mark block at specified address as free
+ */
+static void free_block(void *bp, size_t adjusted_size)
+{
+	size_t size;
+	size_t is_prev_alloc;
+
+	TRACE(">>>Entering free_block(bp=0x%X, adjusted_size=%u)\n", (unsigned int)bp, adjusted_size);
+
+	/* Trying to free NULL pointers will only result in chaos */
+/*
+    if(bp == NULL)
+		return;
+*/
+
+	is_prev_alloc = GET_PREVALLOC(bp);
+	size = GET_THISSIZE(bp);
+
+	PUTW(GET_BLOCKHDR(bp), PACK(size, is_prev_alloc));
+	PUTW(GET_BLOCKFTR(bp), PACK(size, is_prev_alloc));
+
+	TRACE("<<<---Leaving free_block()\n");
 }
 
 /** TODO: Better comment
@@ -497,32 +492,6 @@ helper_p = GET_BLOCKFTR(GET_PAYLOAD(bp));
 		/*remove_from_list(bp, get_node_listindex(bp));*/
 	}
 	TRACE("<<<---Leaving allocate()\n");
-}
-
-
-/** TODO: Better comment
- * Mark block at specified address as free
- */
-static void free_block(void *bp, size_t adjusted_size)
-{
-	size_t size;
-	size_t is_prev_alloc;
-
-	TRACE(">>>Entering free_block(bp=0x%X, adjusted_size=%u)\n", (unsigned int)bp, adjusted_size);
-
-	/* Trying to free NULL pointers will only result in chaos */
-/*
-    if(bp == NULL)
-		return;
-*/
-
-	is_prev_alloc = GET_PREVALLOC(bp);
-	size = GET_SIZE(GET_BLOCKHDR(bp));
-
-	PUTW(GET_BLOCKHDR(bp), PACK(size, is_prev_alloc));
-	PUTW(GET_BLOCKFTR(bp), PACK(size, is_prev_alloc));
-
-	TRACE("<<<---Leaving free_block()\n");
 }
 
 /** TODO: Better comment
@@ -597,6 +566,23 @@ static int get_node_listindex(void *bp)
 }
 
 
+/** TODO: Better comment
+ * TODO: Rename this to something more meaningful
+ * Calculate bits needed to store a value
+ * This is used to determine which free list to look in.
+ */
+static int calc_list_index(size_t size)
+{
+	int bits = 0;
+	TRACE(">>>Entering calc_list_index(size=%u)\n", size);
+	while ((size >> bits > 1) && (bits + 1 < FREELIST_COUNT)) {
+		bits++;
+	}
+	TRACE("<<<---Leaving calc_list_index(), returning %d\n", bits);
+	return bits;
+}
+
+
 
 /**
  * remove_from_list(char *bp, int list_index)
@@ -656,27 +642,27 @@ static void remove_from_list(char *bp, int list_index)
  */
 static void add_to_list(char *bp, int list_index)
 {
-	char *prev;
-	mem_header *header = AS_MEM_HEADER(bp);
-	mem_header *last_node;
+	char *tail_payload;
+	mem_header *tail_node;
+	mem_header *current = AS_MEM_HEADER(bp);
 
 	TRACE(">>>Entering add_to_list(bp=0x%X, list_index=%d)\n", (unsigned int)bp, list_index);
 
-	prev = find_end_of_list(list_index);
+	current->next_free = NULL;
 
-	if (prev == NULL) {
+	tail_payload = find_end_of_list(list_index);
+
+	if (tail_payload == NULL) {
 		free_lists[list_index] = bp;
-		header->next_free = NULL;
-		header->prev_free = NULL;
+		current->prev_free = NULL;
 		TRACE("<<<---Leaving add_to_list(), list's head pointer NULL, list empty\n");
 		return;
 	}
 
-	last_node = AS_MEM_HEADER(prev);
+	tail_node = AS_MEM_HEADER(tail_payload);
 
-	last_node->next_free = bp;
-	header->prev_free = prev;
-	header->next_free = NULL;
+	tail_node->next_free = bp;
+	current->prev_free = tail_payload;
 
 	TRACE("<<<---Leaving add_to_list()\n");
 }
