@@ -46,6 +46,10 @@
 	#include "config.h" /* Need access to MAX_HEAP for debugging purposes */
 	#define TRACE(...) printf(__VA_ARGS__); fflush(stdout)
 
+	/* We created this in our local copy of mdriver.c so we could we
+		exactly which trace was failing */
+	extern int trace_index;
+
 	char* get_heap_str(char *addr, size_t len, size_t bytes_per_block, size_t blocks_per_row);
 	void mm_check();
 #else
