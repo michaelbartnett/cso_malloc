@@ -30,6 +30,11 @@
 /*
  * The To-Do list:
  *
+ * Traces to pass:
+ *	./mdriver -V -f traces/random2-bal.rep
+ *	./mdriver -V -f traces/realloc-bal.rep
+ *	./mdriver -V -f traces/realloc2-bal.rep
+ * Assertion failed: (!avg_tput || *avg_tput > 0), function sumresults, file mdriver.c, line 1011.
  *
  */
 #include <stdio.h>
@@ -137,7 +142,7 @@ team_t team = {
 #define PACK(size, alloc) ((size) | (alloc))
 
 /* Read size field */
-#define GET_SIZE(p) (GETW(p) & 0xFFFFFFF8)
+#define GET_SIZE(p) (GETW(p) & ~(THISALLOC | PREVALLOC))
 /* Read <allocated?> field */
 #define GET_ALLOC(p) (GETW(p) & THISALLOC)
 
@@ -396,7 +401,7 @@ static void *coalesce(void *bp)
 {
 	size_t prev_alloc = GET_PREVALLOC(bp);
 	size_t next_alloc = GET_NEXTALLOC(bp);
-	size_t size = GET_SIZE(GET_BLOCKHDR(bp));
+	size_t size = GET_THISSIZE(bp);
 	char *next_block = GET_NEXTBLOCK(bp);
 	char *prev_block = GET_PREVBLOCK(bp);
 
@@ -476,23 +481,22 @@ static void free_block(void *bp, size_t adjusted_size)
  */
 static void allocate(void *bp, size_t adjusted_size)
 {
-	size_t csize = GET_SIZE(GET_BLOCKHDR(bp));
-	size_t is_prev_alloc;
+	size_t csize = GET_THISSIZE(bp);
+	size_t is_prev_alloc = GET_PREVALLOC(bp);
 	/*void *helper_p; TODO: Delete this*/
 	/*int available_index;*/
 
 	TRACE(">>>Entering allocate(bp=0x%X, adjusted_size=%u)\n", (unsigned int)bp, adjusted_size);
 
-	if ((csize - adjusted_size) >= (MIN_SIZE)) {
-		is_prev_alloc = GET_PREVALLOC(bp);
+	remove_from_list(bp, calc_list_index(csize));
 
+	if ((csize - adjusted_size) >= (MIN_SIZE)) {
 		PUTW(GET_BLOCKHDR(bp), PACK(adjusted_size, THISALLOC | is_prev_alloc));
 		PUTW(GET_BLOCKFTR(bp), PACK(adjusted_size, THISALLOC | is_prev_alloc));
 
 		/*find_fit(adjusted_size, &available_index);*/
 		/* Marking this memory as NOT in teh free list, bp should be a
 			valid pointer to a node in a free list*/
-		 remove_from_list(bp, calc_list_index(csize));
 		/*remove_from_list(bp, get_node_listindex(bp));*/
 
 		bp = GET_NEXTBLOCK(bp);
@@ -667,7 +671,7 @@ static void remove_from_list(char *bp, int list_index)
  * Parameters:
  *
  * 	  bp - Pointer to the payload
- * 	  list_index - The free list index (power of two representing word size)
+ * 	  list_index - The free list index (power of two representing word size-1)
  */
 static void add_to_list(char *bp, int list_index)
 {
