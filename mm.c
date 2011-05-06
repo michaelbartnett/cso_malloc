@@ -53,12 +53,15 @@
 	#define TRACE(...) printf(__VA_ARGS__); fflush(stdout)
 	#define DO_MM_CHECK
 
-	/* We created these globals variables in our local copy of mdriver.c so
-		we could track exactly which trace command was failing and also set
-		conditional breakpoints (ie: break mm_free if traceop_ptr == 158) */
-	typedef struct tag_traceop_t traceop_t;
-	extern int traceop_index;
-	extern int traceop_ptr;
+	#ifndef MTEST
+		/* We created these globals variables in our local copy of mdriver.c so
+			we could track exactly which trace command was failing and also set
+			conditional breakpoints (ie: break mm_free if traceop_ptr == 158) */
+		typedef struct tag_traceop_t traceop_t;
+		extern int traceop_index;
+		extern int traceop_ptr;
+		extern traceop_t* trace_operations;
+	#endif
 #else
 	#define TRACE(...) ;
 #endif
@@ -304,6 +307,7 @@ void mm_free(void *ptr)
 
 	coalesce(ptr);
 
+	RUN_MM_CHECK();
 	TRACE("<<<---Leaving mm_free()\n");
 }
 
@@ -329,6 +333,7 @@ void *mm_realloc(void *ptr, size_t size)
 	return newptr;
 
 
+	RUN_MM_CHECK();
 	TRACE("<<<---Leaving mm_realloc()\n");
 	return NULL;
 }
@@ -698,6 +703,8 @@ void mm_check()
 {
 	int i;
 	char *bp;
+
+	/*printf("----------------------------->>>>>>>Running mm_check.\n");*/
 
 	/* First make sure heap_end is set appropriately */
 	assert(heap_end == mem_heap_hi());
