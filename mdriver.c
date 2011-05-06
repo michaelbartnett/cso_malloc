@@ -141,6 +141,7 @@ static void app_error(char *msg);
 int traceop_index = -1;
 int traceop_ptr = -1;
 traceop_t* trace_operations;
+char *current_trace_name;
 
 
 /**************
@@ -297,6 +298,8 @@ int main(int argc, char **argv)
 
 	/* Evaluate student's mm malloc package using the K-best scheme */
 	for (i=0; i < num_tracefiles; i++) {
+		current_trace_name = tracefiles[i];
+
 		trace = read_trace(tracedir, tracefiles[i]);
 		mm_stats[i].ops = trace->num_ops;
 		if (verbose > 1)
