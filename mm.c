@@ -1,30 +1,26 @@
 /*
- * mm.c - The fastest, least memory-efficient malloc package.
- *
- * This file uses functions and macros from the Virtual Memory chapter in CS:APP
- * implicit free list example. Names of functions and macros have been changed
- * where I felt they better communicated their purpose.
+ * mm.c - This file uses functions and macros from the Virtual Memory chapter
+ * in CS:APP implicit free list example. Names of functions and macros have
+ * been changed where we felt doing so better communicated their purpose.
  *
  * These functions and macros have also been changed to reflect my specific
  * implementation of segregated free lists. Some of the code was reusable, some
- * was not. I make no effort to indicate which lines are taken from the text--
- * I feel my code is different enough to make this unnecessary.
+ * was not. We make no effort to indicate which lines are taken from the text--
+ * we feel our code is different enough to make this unnecessary.
+ * 
+ * Our implementation is based on segregated free lists.
+ * 
+ * The minimum payload size is 3 words.
  *
- * Public Functions
-
-
+ *
+ * Public Functions:
+ *
+ *
  * Private Functions:
  *
  *      allocate_block - Based on the 'place' function in CS:APP implicit free
  *    					  list example.
  */
-
-
-
-
-
-
-
 
 
 /*
@@ -121,7 +117,7 @@ team_t team = {
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
 
 /* The size of a size_t type */
-#define SIZE_T_SIZE (ALIGN(sizeof(size_t)))/* TODO: Delete this unless used */
+#define SIZE_T_SIZE (ALIGN(sizeof(size_t)))/* TODO: Delete this unless used UPDATE: currently used just once, in realloc */
 
 /* Bit flags for alloc fields in block headers */
 #define THISALLOC 0x01
@@ -160,11 +156,10 @@ team_t team = {
 /* Get address of payload */
 #define GET_PAYLOAD(bp) ((char *)(bp) + WSIZE)
 
-/*  */
+/* Return a pointer to payload of the next block */
 #define GET_NEXTBLOCK(bp) ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))
+/* Return a pointer to the payload of the previous block */
 #define GET_PREVBLOCK(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
-
-#define FREELIST_COUNT 13
 
 /* This implementation requires that block sizes be odd and >= 3 words
  * ALIGN_WORDCOUNT aligns to word alignment requirement, whereas
@@ -174,18 +169,20 @@ team_t team = {
 
 
 /* Using size segregated explicit free lists */
+#define FREELIST_COUNT 13
 static char * free_lists[FREELIST_COUNT]; /* Segregate by word size power of 2, up to 4096 words */
 
 
 /* Helper macro to get the mem_header of a payload pointer */
 #define MEMHEADER_FROM_PAYLOAD(p) ((mem_header *)GET_BLOCKHDR(p))
 #define PAYLOAD_FROM_MEMHEADER(mh) ((char *)((mh) + WSIZE))
+
 /* Struct for making linked list manipulation easier */
-typedef struct {			/* IMPORTANT!!! The next_free and prev_free fields*/
-	unsigned int size_alloc;/* of this struct point to the START of payload,  */
-	char *next_free;		/* not the start of the struct. Remember to always*/
-	char *prev_free;		/* adjust if you want to set the *_free of one	  */
-} mem_header;				/* mem_header to another mem_header.			  */
+typedef struct {			 /* IMPORTANT!!! The next_free and prev_free fields */
+	unsigned int size_alloc; /* of this struct point to the START of payload,   */
+	char *next_free;		 /* not the start of the struct. Remember to always */
+	char *prev_free;		 /* adjust if you want to set the *_free of one		*/
+} mem_header;				 /* mem_header to another mem_header.			    */
 
 
 static size_t PAGE_SIZE;
@@ -194,6 +191,7 @@ static size_t ADJUSTED_PAGESIZE;
 static char * heap_start = NULL;
 static char * heap_end = NULL;
 
+/* Function prototypes */
 static int calc_list_index(size_t size);
 static void *extend_heap(size_t adjusted_size);
 static void *coalesce(void *bp);
@@ -208,7 +206,7 @@ static int get_node_listindex(void *bp);
 
 
 /**
- * mm_init - initialize the malloc package.
+ * mm_init - Initialize the malloc package.
  */
 int mm_init(void)
 {
@@ -269,7 +267,7 @@ void *mm_malloc(size_t size)
 
 	/* Ignore stupid/ugly programmers */
 	if (size == 0) {
-		TRACE("<<<---Leaving mm_malloc() because some stupid/ugly programmed asked for size 0\n");
+		TRACE("<<<---Leaving mm_malloc() because some stupid/ugly programmer asked for size 0\n");
 		return NULL;
 	}
 
@@ -294,7 +292,7 @@ void *mm_malloc(size_t size)
 		return NULL;
 	}
 
-	allocate(bp, adjusted_size);
+	allocate(bp, adjusted_size);	/* should this be inside an else? */
 
 	RUN_MM_CHECK();
 	TRACE("<<<---Leaving mm_malloc() returning 0x%X\n", bp);
@@ -303,8 +301,9 @@ void *mm_malloc(size_t size)
 
 
 
-/** TODO: Better comment
- * mm_free -
+/** 
+ * mm_free - Free a block previously allocated by mm_malloc or mm_realloc.
+ * 
  */
 void mm_free(void *ptr)
 {
@@ -319,7 +318,7 @@ void mm_free(void *ptr)
 }
 
 /**
- * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
+ * mm_realloc - Implemented in terms of mm_malloc and mm_free.
  */
 void *mm_realloc(void *ptr, size_t size)
 {
@@ -339,7 +338,7 @@ void *mm_realloc(void *ptr, size_t size)
 	mm_free(oldptr);
 	return newptr;
 
-
+	/* Unreachable -- should be discarded? */
 	RUN_MM_CHECK();
 	TRACE("<<<---Leaving mm_realloc()\n");
 	return NULL;
@@ -347,16 +346,14 @@ void *mm_realloc(void *ptr, size_t size)
 
 
 /**
- * extend_heap(size_t adjusted_size)
- *
- * Extend the heap by number of bytes
+ * extend_heap - Extend the heap by number of bytes adjusted_size.
  *
  * This differs from the example extend_heap function in that the parameter
  * passed is in BYTES rather than WORDS. Constantly converting between the two
  * is confusing and unnecessary.
  *
  * Furthermore, it should be a size already adjusted to fit byte and header
- * alignment. This function merely sets header/footer/successor as needed
+ * alignment. This function merely sets header/footer/successor as needed.
  */
 static void *extend_heap(size_t adjusted_size)
 {
@@ -391,11 +388,11 @@ static void *extend_heap(size_t adjusted_size)
 
 
 
-/** TODO: Better comment
- * Concatenate adjacent blocks
+/**
+ * coalesce - Concatenate adjacent blocks to prevent fragmentation.
  *
- * Should upkeep the free list. Assumes that bp is always a free block
- * Also assumes that bp has not been added to a free list.
+ * Should upkeep the free list. Assumes that bp is a free block.
+ * Also assumes that bp has not yet been added to a free list.
  */
 static void *coalesce(void *bp)
 {
@@ -408,7 +405,7 @@ static void *coalesce(void *bp)
 	TRACE(">>>Entering coalesce(bp=0x%X)\n", (unsigned int)bp);
 
 	/* Case 1, Both blocks allocated, does not need its own if statement */
-	if (prev_alloc && !next_alloc) { /* next_block is free */
+	if (prev_alloc && !next_alloc) { /* Case 2: only next_block is free */
 		remove_from_list(next_block, calc_list_index(GET_THISSIZE(next_block)));
 
 		/* Only need to update the size field */
@@ -418,7 +415,7 @@ static void *coalesce(void *bp)
 		PUTW(GET_BLOCKFTR(bp), PACK(size, prev_alloc));
 	}
 
-	else if (!prev_alloc && next_alloc) { /* prev_block is free */
+	else if (!prev_alloc && next_alloc) { /* Case 3: only prev_block is free */
 		remove_from_list(prev_block, calc_list_index(GET_THISSIZE(prev_block)));
 
 		/* Need to update the size and prev_alloc field */
@@ -430,7 +427,7 @@ static void *coalesce(void *bp)
 		bp = prev_block;
 	}
 
-	else if (!prev_alloc && !next_alloc) { /* Both blocks are free */
+	else if (!prev_alloc && !next_alloc) { /* Case 4: Both blocks are free */
 		remove_from_list(next_block, calc_list_index(GET_THISSIZE(next_block)));
 		remove_from_list(prev_block, calc_list_index(GET_THISSIZE(prev_block)));
 
@@ -451,8 +448,9 @@ static void *coalesce(void *bp)
 }
 
 
-/** TODO: Better comment
- * Mark block at specified address as free
+/** 
+ * free_block - Mark block at specified address as free.
+ * Payload remains intact until later overwritten.
  */
 static void free_block(void *bp, size_t adjusted_size)
 {
@@ -460,12 +458,6 @@ static void free_block(void *bp, size_t adjusted_size)
 	size_t is_prev_alloc;
 
 	TRACE(">>>Entering free_block(bp=0x%X, adjusted_size=%u)\n", (unsigned int)bp, adjusted_size);
-
-	/* Trying to free NULL pointers will only result in chaos */
-/*
-    if(bp == NULL)
-		return;
-*/
 
 	is_prev_alloc = GET_PREVALLOC(bp);
 	size = GET_THISSIZE(bp);
@@ -476,16 +468,14 @@ static void free_block(void *bp, size_t adjusted_size)
 	TRACE("<<<---Leaving free_block()\n");
 }
 
-/** TODO: Better comment
- * place block (Write header & footer)
+/**
+ * allocate - Place block, i.e. write header and footer.
  */
 static void allocate(void *bp, size_t adjusted_size)
 {
 	size_t csize = GET_THISSIZE(bp);
 	size_t is_prev_alloc = GET_PREVALLOC(bp);
-	/*void *helper_p; TODO: Delete this*/
-	/*int available_index;*/
-
+	
 	TRACE(">>>Entering allocate(bp=0x%X, adjusted_size=%u)\n", (unsigned int)bp, adjusted_size);
 
 	remove_from_list(bp, calc_list_index(csize));
@@ -493,11 +483,6 @@ static void allocate(void *bp, size_t adjusted_size)
 	if ((csize - adjusted_size) >= (MIN_SIZE)) {
 		PUTW(GET_BLOCKHDR(bp), PACK(adjusted_size, THISALLOC | is_prev_alloc));
 		PUTW(GET_BLOCKFTR(bp), PACK(adjusted_size, THISALLOC | is_prev_alloc));
-
-		/*find_fit(adjusted_size, &available_index);*/
-		/* Marking this memory as NOT in teh free list, bp should be a
-			valid pointer to a node in a free list*/
-		/*remove_from_list(bp, get_node_listindex(bp));*/
 
 		bp = GET_NEXTBLOCK(bp);
 		PUTW(GET_BLOCKHDR(bp), PACK(csize - adjusted_size, PREVALLOC));
@@ -512,23 +497,12 @@ static void allocate(void *bp, size_t adjusted_size)
 		/* Make sure the next block's header has the prevalloc field marked */
 		bp = GET_BLOCKHDR(GET_NEXTBLOCK(bp));
 		PUTW(bp, GETW(bp) | PREVALLOC);
-/*		bp = GET_BLOCKFTR(GET_PAYLOAD(bp));*/
-		/* Same goes for the footer if it isn't allocted */
-		/*
-helper_p = GET_BLOCKFTR(GET_PAYLOAD(bp));
-		PUTW(helper_p, GETW(helper_p) | (GET_THISALLOC(helper_p) ? 0 : PREVALLOC));
-*/
-
-
-
-		/*remove_from_list(bp, calc_list_index(csize));*/
-		/*remove_from_list(bp, get_node_listindex(bp));*/
 	}
 	TRACE("<<<---Leaving allocate()\n");
 }
 
-/** TODO: Better comment
- * Find a free block of memory of size block_size
+/** 
+ * find_fit - Find a free block of memory of size block_size.
  */
 static void * find_fit(size_t block_size, int *result_index)
 {
@@ -542,6 +516,7 @@ static void * find_fit(size_t block_size, int *result_index)
 	/* Look at the free list with the minimum size needed to hold block_size */
 	for (list_index = min_index; list_index < FREELIST_COUNT; list_index++) {
 		fitptr = free_lists[list_index];
+		
 		/* If the head of the list is not null, we can use it */
 		if (fitptr != NULL && GET_THISSIZE(fitptr) >= block_size) {
 			*result_index = list_index;
@@ -556,8 +531,8 @@ static void * find_fit(size_t block_size, int *result_index)
 
 
 
-/** TODO: Better comment
- *
+/** 
+ * find_end_of_list - Return a pointer to the payload of the last element of free_lists[list_index].
  */
 static void *find_end_of_list(int list_index)
 {
@@ -575,8 +550,8 @@ static void *find_end_of_list(int list_index)
 }
 
 
-/** TODO: Better comment
- *
+/** 
+ * get_node_listindex - Given a pointer, determine which free list it is in.
  */
 static int get_node_listindex(void *bp)
 {
@@ -599,10 +574,8 @@ static int get_node_listindex(void *bp)
 }
 
 
-/** TODO: Better comment
- * TODO: Rename this to something more meaningful
- * Calculate bits needed to store a value
- * This is used to determine which free list to look in.
+/**
+ * calc_list_index - Determine which free list to look in, given a size.
  */
 static int calc_list_index(size_t size)
 {
@@ -618,14 +591,7 @@ static int calc_list_index(size_t size)
 
 
 /**
- * remove_from_list(char *bp, int list_index)
- *
- * Remove the block from the specified free list
- *
- * Parameters:
- *
- * 	  bp - Pointer to the payload
- * 	  list_index - The free list index (power of two representing word size)
+ * remove_from_list - Remove the block from the specified free list
  */
 static void remove_from_list(char *bp, int list_index)
 {
@@ -639,24 +605,17 @@ static void remove_from_list(char *bp, int list_index)
 	TRACE("        header->prev_free = %0x%X\n", header->prev_free);
 
 	if (header->next_free != NULL) {
-		TRACE("        entering if statement 1\n");
 		next_header = MEMHEADER_FROM_PAYLOAD(header->next_free);
-		TRACE("			got to middle section\n");
 		next_header->prev_free = header->prev_free;
-		TRACE("        leaving if statement 1\n");
 	}
 
 	if (header->prev_free != NULL) {
-		TRACE("        entering if statement 2\n");
 		prev_header = MEMHEADER_FROM_PAYLOAD(header->prev_free);
 		prev_header->next_free = header->next_free;
-		TRACE("        leaving if statement 2\n");
 	}
 
 	if (free_lists[list_index] == bp) {
-		TRACE("        entering if statement 3\n");
 		free_lists[list_index] = header->next_free;
-		TRACE("        leaving if statement 3\n");
 	}
 	TRACE("<<<---Leaving remove_from_list()\n");
 }
@@ -664,14 +623,7 @@ static void remove_from_list(char *bp, int list_index)
 
 
 /**
- * add_to_list(char *bp, int list_index)
- *
- * Add the block to the specified free list
- *
- * Parameters:
- *
- * 	  bp - Pointer to the payload
- * 	  list_index - The free list index (power of two representing word size-1)
+ * add_to_list - Add the block to the specified free list.
  */
 static void add_to_list(char *bp, int list_index)
 {
@@ -738,24 +690,22 @@ static void add_to_list(char *bp, int list_index)
 
 #ifdef DO_MM_CHECK
 /**
- *
+ * mm_check - Check the consistency of the heap.
  */
 void mm_check()
 {
 	int i;
 	char *bp;
 
-	/*printf("----------------------------->>>>>>>Running mm_check.\n");*/
-
-	/* First make sure heap_end is set appropriately */
+	/* First, make sure heap_end is set appropriately. */
 	assert(heap_end == mem_heap_hi());
 
-	/* Then check to ensure that we have no data past MAX_HEAP */
+	/* Then, check to ensure that we have no data past MAX_HEAP. */
 	assert(heap_end < heap_start + MAX_HEAP);
 
 
 	#ifdef DO_HEAP_OVERWRITE_CHECK
-	/* Then make sure we haven't written past mem_heap_hi() */
+	/* Next, make sure we haven't written past mem_heap_hi(). */
 	bp = heap_end + 1;
 	while (bp < heap_start + MAX_HEAP) {
 		assert((*bp) == 0);
@@ -763,7 +713,7 @@ void mm_check()
 	}
 	#endif
 
-	/* Then make sure the blocks in our free lists are actually free */
+	/* Then, make sure the blocks in our free lists are actually free. */
 	for (i = 0; i < FREELIST_COUNT; i++) {
 		if (free_lists[i] != NULL) {
 			bp = free_lists[i];
@@ -774,7 +724,7 @@ void mm_check()
 			} while (bp != NULL);
 		}
 	}
-
+	/* Finally, make sure no block is grossly oversized. */
 	bp = heap_start + 4 * WSIZE;
 
 	while (bp < heap_end) {
