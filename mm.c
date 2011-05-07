@@ -10,7 +10,7 @@
  *
  * Our implementation is based on segregated free lists.
  *
- * The minimum payload size is 3 words.  					  list example.
+ * The minimum payload size is 3 words.
  */
 
 
@@ -155,12 +155,12 @@ team_t team = {
 /* This implementation requires that block sizes be odd and >= 3 words
  * ALIGN_WORDCOUNT aligns to word alignment requirement, whereas
  * ADJUST_BYTESIZE aligns to proper ALIGNMENT in bytes */
-#define ADJUST_WORDCOUNT(size) ((size) < 3 ? 3 : (size) + (((size) % 2) ^ 0x01))
+#define ADJUST_WORDCOUNT(size) ((size) < 5 ? 5 : (size) + (((size) % 2) ^ 0x01))
 #define ADJUST_BYTESIZE(size) (ALIGN((ADJUST_WORDCOUNT(((size) + WSIZE - 1)/WSIZE)) * WSIZE))
 
 
 /* Using size segregated explicit free lists */
-#define FREELIST_COUNT 15
+#define FREELIST_COUNT 19
 static char * free_lists[FREELIST_COUNT]; /* Segregate by word size power of 2, up to 4096 words */
 
 
