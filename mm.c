@@ -541,14 +541,14 @@ static void * find_fit(size_t block_size, int *result_index)
  */
 static void *find_end_of_list(int list_index)
 {
-	char *bp = free_lists[list_index];
-	 *next_bp = bp;
+	size_t *bp = (size_t *)free_lists[list_index];
+	size_t *next_bp = bp;
 
 	TRACE(">>>Entering find_end_of_list(list_index=%d)\n", list_index);
 
 	while (next_bp != NULL) {
 		bp = next_bp;
-		next_bp = *bp;
+		next_bp = (size_t *)(*((size_t *)bp));
 	}
 	TRACE("<<<---Leaving find_end_of_list() returning 0x%X\n", bp);
 	return bp;
