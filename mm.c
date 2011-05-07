@@ -11,15 +11,6 @@
  * Our implementation is based on segregated free lists.
  * 
  * The minimum payload size is 3 words.
- *
- *
- * Public Functions:
- *
- *
- * Private Functions:
- *
- *      allocate_block - Based on the 'place' function in CS:APP implicit free
- *    					  list example.
  */
 
 
@@ -292,7 +283,7 @@ void *mm_malloc(size_t size)
 		return NULL;
 	}
 
-	allocate(bp, adjusted_size);	/* should this be inside an else? */
+	allocate(bp, adjusted_size);
 
 	RUN_MM_CHECK();
 	TRACE("<<<---Leaving mm_malloc() returning 0x%X\n", bp);
