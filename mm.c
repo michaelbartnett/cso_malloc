@@ -13,17 +13,6 @@
  * The minimum payload size is 3 words.
  */
 
-
-/*
- * The To-Do list:
- *
- * Traces to pass:
- *	./mdriver -V -f traces/random2-bal.rep
- *	./mdriver -V -f traces/realloc-bal.rep
- *	./mdriver -V -f traces/realloc2-bal.rep
- * Assertion failed: (!avg_tput || *avg_tput > 0), function sumresults, file mdriver.c, line 1011.
- *
- */
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -108,7 +97,7 @@ team_t team = {
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
 
 /* The size of a size_t type */
-#define SIZE_T_SIZE (ALIGN(sizeof(size_t)))/* TODO: Delete this unless used UPDATE: currently used just once, in realloc */
+#define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
 /* Bit flags for alloc fields in block headers */
 #define THISALLOC 0x01
