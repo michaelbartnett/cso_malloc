@@ -7,19 +7,10 @@
  * implementation of segregated free lists. Some of the code was reusable, some
  * was not. We make no effort to indicate which lines are taken from the text--
  * we feel our code is different enough to make this unnecessary.
- * 
+ *
  * Our implementation is based on segregated free lists.
- * 
- * The minimum payload size is 3 words.
  *
- *
- * Public Functions:
- *
- *
- * Private Functions:
- *
- *      allocate_block - Based on the 'place' function in CS:APP implicit free
- *    					  list example.
+ * The minimum payload size is 3 words.  					  list example.
  */
 
 
@@ -292,7 +283,7 @@ void *mm_malloc(size_t size)
 		return NULL;
 	}
 
-	allocate(bp, adjusted_size);	/* should this be inside an else? */
+	allocate(bp, adjusted_size);
 
 	RUN_MM_CHECK();
 	TRACE("<<<---Leaving mm_malloc() returning 0x%X\n", bp);
@@ -301,9 +292,9 @@ void *mm_malloc(size_t size)
 
 
 
-/** 
+/**
  * mm_free - Free a block previously allocated by mm_malloc or mm_realloc.
- * 
+ *
  */
 void mm_free(void *ptr)
 {
@@ -336,12 +327,11 @@ void *mm_realloc(void *ptr, size_t size)
 		copySize = size;
 	memcpy(newptr, oldptr, copySize);
 	mm_free(oldptr);
-	return newptr;
 
 	/* Unreachable -- should be discarded? */
 	RUN_MM_CHECK();
 	TRACE("<<<---Leaving mm_realloc()\n");
-	return NULL;
+	return newptr;
 }
 
 
@@ -448,7 +438,7 @@ static void *coalesce(void *bp)
 }
 
 
-/** 
+/**
  * free_block - Mark block at specified address as free.
  * Payload remains intact until later overwritten.
  */
@@ -475,22 +465,27 @@ static void allocate(void *bp, size_t adjusted_size)
 {
 	size_t csize = GET_THISSIZE(bp);
 	size_t is_prev_alloc = GET_PREVALLOC(bp);
-	
+
 	TRACE(">>>Entering allocate(bp=0x%X, adjusted_size=%u)\n", (unsigned int)bp, adjusted_size);
 
+	/* We will always need to remove tshi block from the free list */
 	remove_from_list(bp, calc_list_index(csize));
 
+	/* See if there's room to split this block into two */
 	if ((csize - adjusted_size) >= (MIN_SIZE)) {
 		PUTW(GET_BLOCKHDR(bp), PACK(adjusted_size, THISALLOC | is_prev_alloc));
 		PUTW(GET_BLOCKFTR(bp), PACK(adjusted_size, THISALLOC | is_prev_alloc));
 
+		/* Using the new header info, mark the newly created block as free */
 		bp = GET_NEXTBLOCK(bp);
 		PUTW(GET_BLOCKHDR(bp), PACK(csize - adjusted_size, PREVALLOC));
 		PUTW(GET_BLOCKFTR(bp), PACK(csize - adjusted_size, PREVALLOC));
 
+		/* And add it to the appropriate free list */
 		add_to_list(bp, calc_list_index(csize - adjusted_size));
 	}
-	else {
+	else {/* If there's not room to create split the block, just extend the
+		 	amount to allocated */
 		PUTW(GET_BLOCKHDR(bp), PACK(csize, THISALLOC | is_prev_alloc));
 		PUTW(GET_BLOCKFTR(bp), PACK(csize, THISALLOC | is_prev_alloc));
 
@@ -501,14 +496,17 @@ static void allocate(void *bp, size_t adjusted_size)
 	TRACE("<<<---Leaving allocate()\n");
 }
 
-/** 
+/**
  * find_fit - Find a free block of memory of size block_size.
+ *
+ * This function assumes that block_size has already been adjusted
+ * to fit alignment and header requirements.
  */
 static void * find_fit(size_t block_size, int *result_index)
 {
 	int list_index,
 		/* Make sure we search according to size & alignment requirements */
-		min_index = /*ADJUST_WORDCOUNT(*/calc_list_index(block_size)/*)*/;
+		min_index = calc_list_index(block_size);
 	void *fitptr;
 
 	TRACE(">>>Entering find_fit(block_size=%u, [retval result_index])\n", block_size);
@@ -516,7 +514,7 @@ static void * find_fit(size_t block_size, int *result_index)
 	/* Look at the free list with the minimum size needed to hold block_size */
 	for (list_index = min_index; list_index < FREELIST_COUNT; list_index++) {
 		fitptr = free_lists[list_index];
-		
+
 		/* If the head of the list is not null, we can use it */
 		if (fitptr != NULL && GET_THISSIZE(fitptr) >= block_size) {
 			*result_index = list_index;
@@ -531,26 +529,26 @@ static void * find_fit(size_t block_size, int *result_index)
 
 
 
-/** 
+/**
  * find_end_of_list - Return a pointer to the payload of the last element of free_lists[list_index].
  */
 static void *find_end_of_list(int list_index)
 {
-	size_t *bp = (size_t *)free_lists[list_index];
-	size_t *next_bp = bp;
+	char *bp = free_lists[list_index];
+	 *next_bp = bp;
 
 	TRACE(">>>Entering find_end_of_list(list_index=%d)\n", list_index);
 
 	while (next_bp != NULL) {
 		bp = next_bp;
-		next_bp = (size_t *)(*((size_t *)bp));
+		next_bp = *bp;
 	}
 	TRACE("<<<---Leaving find_end_of_list() returning 0x%X\n", bp);
 	return bp;
 }
 
 
-/** 
+/**
  * get_node_listindex - Given a pointer, determine which free list it is in.
  */
 static int get_node_listindex(void *bp)
@@ -715,16 +713,16 @@ void mm_check()
 
 	/* Then, make sure the blocks in our free lists are actually free. */
 	for (i = 0; i < FREELIST_COUNT; i++) {
-		if (free_lists[i] != NULL) {
-			bp = free_lists[i];
-			do {
-				assert(!GET_THISALLOC(bp));
-				assert(GET_THISSIZE(bp) < MAX_BLOCK_ALLOCSIZE);
-				bp = MEMHEADER_FROM_PAYLOAD(bp)->next_free;
-			} while (bp != NULL);
+		bp = free_lists[i];
+		while (bp != NULL) {
+			assert(!GET_THISALLOC(bp));
+			assert(GET_THISSIZE(bp) < MAX_BLOCK_ALLOCSIZE);
+			bp = MEMHEADER_FROM_PAYLOAD(bp)->next_free;
 		}
 	}
-	/* Finally, make sure no block is grossly oversized. */
+	/* Finally, make sure we haven't misaligned our headers and payload.
+		If a payload is misinterpreted as a header, its size will be
+		over 1 million (discounting the first block which is all zeroes). */
 	bp = heap_start + 4 * WSIZE;
 
 	while (bp < heap_end) {
@@ -787,7 +785,7 @@ int test_main(int argc, char* argv[])
 	debuggable_memset(arr[3], 0xF3, 4072);
 */
 	int *temp = mm_malloc(100);
-	
+
 	mm_free(temp);
 
 	return 0;
