@@ -160,7 +160,7 @@ team_t team = {
 
 
 /* Using size segregated explicit free lists */
-#define FREELIST_COUNT 19
+#define FREELIST_COUNT 25
 static char * free_lists[FREELIST_COUNT]; /* Segregate by word size power of 2, up to 4096 words */
 
 
@@ -209,12 +209,12 @@ int mm_init(void)
 		memset(mem_heap_lo(), 0, MAX_HEAP);
 	#endif
 
-
+	/*Each element in free_lists starts off as the empty head of a linked list*/
 	memset(free_lists, (int)NULL, sizeof(free_lists));
 
 	/* Initialize write-once variables */
 	PAGE_SIZE = mem_pagesize();
-	ADJUSTED_PAGESIZE = ADJUST_BYTESIZE(PAGE_SIZE);
+	ADJUSTED_PAGESIZE = ADJUST_BYTESIZE((PAGE_SIZE*2));
 
 	/* Initially allocate 1 page of memory plus room for
 		the prologue and epilogue blocks and free block header */
@@ -322,7 +322,9 @@ void *mm_realloc(void *ptr, size_t size)
 	newptr = mm_malloc(size);
 	if (newptr == NULL)
 		return NULL;
-	copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
+
+	copySize = GET_THISSIZE(oldptr);
+
 	if (size < copySize)
 		copySize = size;
 	memcpy(newptr, oldptr, copySize);
@@ -482,7 +484,7 @@ static void allocate(void *bp, size_t adjusted_size)
 		PUTW(GET_BLOCKFTR(bp), PACK(csize - adjusted_size, PREVALLOC));
 
 		/* And add it to the appropriate free list */
-		add_to_list(bp, calc_list_index(csize - adjusted_size));
+		coalesce(bp);
 	}
 	else {/* If there's not room to create split the block, just extend the
 		 	amount to allocated */
