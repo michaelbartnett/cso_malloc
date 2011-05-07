@@ -7,17 +7,10 @@
  * implementation of segregated free lists. Some of the code was reusable, some
  * was not. We make no effort to indicate which lines are taken from the text--
  * we feel our code is different enough to make this unnecessary.
-<<<<<<< HEAD
- * 
+ *
  * Our implementation is based on segregated free lists.
- * 
+ *
  * The minimum payload size is 3 words.
-=======
- *
- * Our implementation is based on segregated free lists.
- *
- * The minimum payload size is 3 words.  					  list example.
->>>>>>> da69df0ff26bd93b20ad92d4ae55bc886f9e9132
  */
 
 
@@ -162,12 +155,12 @@ team_t team = {
 /* This implementation requires that block sizes be odd and >= 3 words
  * ALIGN_WORDCOUNT aligns to word alignment requirement, whereas
  * ADJUST_BYTESIZE aligns to proper ALIGNMENT in bytes */
-#define ADJUST_WORDCOUNT(size) ((size) < 3 ? 3 : (size) + (((size) % 2) ^ 0x01))
+#define ADJUST_WORDCOUNT(size) ((size) < 5 ? 5 : (size) + (((size) % 2) ^ 0x01))
 #define ADJUST_BYTESIZE(size) (ALIGN((ADJUST_WORDCOUNT(((size) + WSIZE - 1)/WSIZE)) * WSIZE))
 
 
 /* Using size segregated explicit free lists */
-#define FREELIST_COUNT 13
+#define FREELIST_COUNT 19
 static char * free_lists[FREELIST_COUNT]; /* Segregate by word size power of 2, up to 4096 words */
 
 
