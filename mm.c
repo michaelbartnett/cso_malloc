@@ -160,8 +160,8 @@ team_t team = {
 
 
 /* Using size segregated explicit free lists */
-#define FREELIST_COUNT 19
-static char * free_lists[FREELIST_COUNT]; /* Segregate by word size power of 2, up to 4096 words */
+#define FREELIST_COUNT 17
+static char * free_lists[FREELIST_COUNT]; /* Segregate by word size power of 2, up to 65536 words */
 
 
 /* Helper macro to get the mem_header of a payload pointer */
